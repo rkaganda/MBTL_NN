@@ -5,7 +5,6 @@ import copy
 import keyboard
 from struct import unpack, pack
 
-from Fighting_Game_Indicator import indicator
 
 from mem_access_util import mem_util
 

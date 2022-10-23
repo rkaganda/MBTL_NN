@@ -1,4 +1,4 @@
-run_name: p1_x_posi_test_1
+run_name: "p1_x_norm_reward"
 minmax_file: "data/test_minmax.json"
 valid_inputs:
   - "2"
@@ -6,9 +6,11 @@ valid_inputs:
   - "8"
   - "6"
 
-model_file: "20221022_215205"
+timer_max: 8000
+
+model_file: "20221023_080139"
 
 log_level: DEBUG
 
-
+save_model: False
 

@@ -131,10 +131,10 @@ def capture_round():
     eval_ready = Event()
 
     # params
-    frames_per_observation = 5
+    frames_per_observation = 10
     reaction_delay = 5
     learning_rate = 1e-5
-    timer_max = 2000
+    timer_max = config.settings['timer_max']
 
     # create workers and processes
     # generate_p1_inputs_process = Process(
@@ -217,6 +217,6 @@ def collect_data(capture_count):
 
 if __name__ == "__main__":
     mp.set_start_method('spawn')
-    collect_data(20)
+    collect_data(1)
 
     # test_no_inputs()

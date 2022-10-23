@@ -205,6 +205,9 @@ def calculate_reward_df(merged_eval_actual_state_df):
         name='p_0_x_posi_diff_reward'))
 
     # fig.show()
+    merged_eval_actual_state_df['p_0_x_posi_diff_reward'] = \
+        (merged_eval_actual_state_df['p_0_x_posi_diff_reward'] - merged_eval_actual_state_df[
+            'p_0_x_posi_diff_reward'].mean()) / merged_eval_actual_state_df['p_0_x_posi_diff_reward'].std()
 
     return merged_eval_actual_state_df
 
@@ -272,15 +275,15 @@ def generate_json_from_in_out_df(output_with_input_and_reward):
 
 
 def main():
-    run_name = "p1_x_posi_test_1"
+    run_name = "p1_x_posi_test"
     eval_path = "data/eval/{}".format(run_name)
 
     onlyfiles = [f for f in listdir(eval_path) if isfile(join(eval_path, f))]
 
     for file in onlyfiles:
         if file.startswith('eval_'):
-            reward_file = file.replace('eval_', 'reward_')
             print(file)
+            reward_file = file.replace('eval_', 'reward_')
             df = caclulate_reward_from_eval("{}/{}".format(eval_path, file))
             file_json = generate_json_from_in_out_df(df)
 

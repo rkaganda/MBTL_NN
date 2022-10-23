@@ -81,6 +81,9 @@ class EvalWorker(mp.Process):
 
         if config.settings['model_file'] is not None:
             model.load_model(self.model, self.optimizer)
+            print("loaded model")
+        else:
+            print("fresh model")
 
         self.model.to(device)
         self.model.eval()
@@ -137,7 +140,6 @@ class EvalWorker(mp.Process):
                             out_tensor = self.model(in_tensor)
 
                         detached_out = out_tensor.detach().cpu()
-
                         prob = torch.bernoulli(detached_out).numpy()
 
                         for idx, key in enumerate(self.state_format['input']):
@@ -159,7 +161,8 @@ class EvalWorker(mp.Process):
                         last_evaluated_index = last_evaluated_index + 1
             print("cleaning up")
             self.round_cleanup(normalized_states, model_output)
-            model.save_model(self.model, self.optimizer)
+            if config.settings['save_model']:
+                model.save_model(self.model, self.optimizer)
         except Exception as identifier:
             logger.error(identifier)
             logger.error(traceback.format_exc())
