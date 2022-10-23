@@ -1,0 +1,14 @@
+run_name: p1_x_posi_test_1
+minmax_file: "data/test_minmax.json"
+valid_inputs:
+  - "2"
+  - "4"
+  - "8"
+  - "6"
+
+model_file: "20221022_215205"
+
+log_level: DEBUG
+
+
+
