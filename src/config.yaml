@@ -1,14 +1,18 @@
-run_name: "p1_x_norm_reward"
+run_name: "smooth_reset"
 minmax_file: "data/test_minmax.json"
 valid_inputs:
   - "2"
   - "4"
   - "8"
   - "6"
+  - "a"
+  - "b"
+  - "c"
+  - "d"
 
-timer_max: 8000
+model_file:
 
-model_file: "20221023_080139"
+timer_max: 1000
 
 log_level: DEBUG
 

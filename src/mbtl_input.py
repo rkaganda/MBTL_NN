@@ -117,34 +117,34 @@ def ReleaseKey(hexKeyCode):
 # _P1_directions = [_P1_1, _P1_2, _P1_3, _P1_4, _P1_6, _P1_7, _P1_8, _P1_9, []]
 # _P1_buttons = [_P1_A, _P1_B, _P1_C, _P1_D]
 
-p1_mapping_dict = dict()
-p1_mapping_dict['2'] = 0x53  # P1 2 # s
-p1_mapping_dict['4'] = 0x41  # P1 4 # a
-p1_mapping_dict['8'] = 0x44  # P1 8 # d
-p1_mapping_dict['6'] = 0x57  # P1 6 # w
+mapping_dicts = dict()
+
+mapping_dicts[0] = dict()
+mapping_dicts[0]['2'] = 0x53  # P1 2 # s
+mapping_dicts[0]['4'] = 0x41  # P1 4 # a
+mapping_dicts[0]['8'] = 0x44  # P1 8 # d
+mapping_dicts[0]['6'] = 0x57  # P1 6 # w
 # buttons
-p1_mapping_dict['a'] = 0x49  # P1 A # i
-p1_mapping_dict['b'] = 0x55  # P1 B # u
-p1_mapping_dict['c'] = 0x4F  # P1 C # o
-p1_mapping_dict['d'] = 0x4A  # P1 D # j
+mapping_dicts[0]['a'] = 0x49  # P1 A # i
+mapping_dicts[0]['b'] = 0x55  # P1 B # u
+mapping_dicts[0]['c'] = 0x4F  # P1 C # o
+mapping_dicts[0]['d'] = 0x4A  # P1 D # j
 
 # P2
-p2_mapping_dict = dict()
+mapping_dicts[1] = dict()
 # directions
-p2_mapping_dict['2'] = 0x58  # P2 2 # x #
-p2_mapping_dict['4'] = 0x56  # P2 4 # c
-p2_mapping_dict['8'] = 0x5A  # P2 8 # v
-p2_mapping_dict['6'] = 0x43  # P2 6 # z
+mapping_dicts[1]['2'] = 0x58  # P2 2 # x #
+mapping_dicts[1]['4'] = 0x56  # P2 4 # c
+mapping_dicts[1]['8'] = 0x5A  # P2 8 # v
+mapping_dicts[1]['6'] = 0x43  # P2 6 # z
 # buttons
-p2_mapping_dict['a'] = 0x42  # P2 A # b
-p2_mapping_dict['b'] = 0x4E  # P2 B # n
-p2_mapping_dict['c'] = 0x4D  # P2 C # m
-p2_mapping_dict['d'] = 0xBC  # P2 D # ,
+mapping_dicts[1]['a'] = 0x42  # P2 A # b
+mapping_dicts[1]['b'] = 0x4E  # P2 B # n
+mapping_dicts[1]['c'] = 0x4D  # P2 C # m
+mapping_dicts[1]['d'] = 0xBC  # P2 D # ,
 
 
-def create_p1_input_dict():
-    input_dict = Manager().dict()
-
+def create_input_dict(input_dict):
     for k in config.settings['valid_inputs']:
         input_dict[k] = 0
 
@@ -160,17 +160,20 @@ def create_p2_input_dict():
     return input_dict
 
 
-def do_inputs(input_dict, mapping_dict, die):
+def do_inputs(input_dict, mapping_dict, die, env_status):
     input_pressed = copy.deepcopy(input_dict)
     while not die.is_set():
-        time.sleep(.013)
-        for k in input_dict.keys():
-            if input_dict[k] and not input_pressed[k]:
-                PressKey(mapping_dict[k])
-                input_pressed[k] = True
-            elif input_pressed[k] and not input_dict[k]:
-                ReleaseKey(mapping_dict[k])
-                input_pressed[k] = False
+        if not env_status['round_done']:
+            time.sleep(.012)
+            for k in input_dict.keys():
+                if input_dict[k] and not input_pressed[k]:
+                    PressKey(mapping_dict[k])
+                    input_pressed[k] = True
+                elif input_pressed[k] and not input_dict[k]:
+                    ReleaseKey(mapping_dict[k])
+                    input_pressed[k] = False
+        else:
+            time.sleep(.001)
     print("do_inputs die..")
     for k in input_pressed:
         ReleaseKey(mapping_dict[k])
@@ -193,24 +196,19 @@ def randomize_inputs(input_dict):
 
 
 def reset_round():
-    time.sleep(.5)
+    time.sleep(.001)
     # make sure every key is released
-    for k in p1_mapping_dict.values():
-        time.sleep(.001)
-        ReleaseKey(k)
-
-    for k in p2_mapping_dict.values():
-        time.sleep(.001)
-        ReleaseKey(k)
-
-    time.sleep(.5)
+    for _, mapping_dict in mapping_dicts.items():
+        for k in mapping_dict.values():
+            time.sleep(.001)
+            ReleaseKey(k)
 
     PressKey(0x53)  # s # down
-    time.sleep(.02)
+    time.sleep(.001)
     PressKey(0x52)  # r
 
-    time.sleep(.02)
+    time.sleep(.005)
     ReleaseKey(0x52)  # r
-    time.sleep(.02)
+    time.sleep(.001)
     ReleaseKey(0x53)  # s # down
-    time.sleep(.02)
+    # time.sleep(.001)

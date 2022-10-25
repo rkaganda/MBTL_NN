@@ -38,8 +38,8 @@ def setup_model(frames_per_observation, input_state_size, state_state_size, lear
     return model, optimizer
 
 
-def load_model(model, optimizer):
-    path = "data/eval/{}/model/".format(config.settings['run_name'])
+def load_model(model, optimizer, player_idx):
+    path = "data/eval/{}/model/{}".format(config.settings['run_name'], player_idx)
 
     model.load_state_dict(
         torch.load("{}/{}.model".format(path, config.settings['model_file']),
@@ -48,7 +48,7 @@ def load_model(model, optimizer):
     print("loaded model = {}".format("{}/{}.model".format(path, config.settings['model_file'])))
 
 
-def save_model(model, optim):
+def save_model(model, optim, player_idx):
     path = "data/eval/{}/model/".format(config.settings['run_name'])
     time_str = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
 

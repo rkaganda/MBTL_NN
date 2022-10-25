@@ -17,6 +17,7 @@ import multiprocessing as mp
 from multiprocessing import Process, Manager, Event
 # import torch.multiprocessing as mp
 # from torch.multiprocessing import Process, Manager, Event
+import logging
 
 import config
 import mbtl_input
@@ -28,6 +29,9 @@ with open(config.settings['minmax_file']) as f:
     state_format['input'] = config.settings['valid_inputs']
 
 attrib_keys = list(state_format['attrib'])
+
+logging.basicConfig(filename='logs/train.log', level=logging.DEBUG, format='%(asctime)s %(levelname)-8s %(message)s')
+logger = logging.getLogger(__name__)
 
 
 def get_state_data(cfg):
@@ -46,7 +50,7 @@ def get_state_data(cfg):
     return state_data
 
 
-def monitor_state(game_states, input_state, timer_log, status, timer_max):
+def monitor_state(game_states, input_states, timer_log, env_status, eval_statuses, timer_max):
     cfg = cfg_tl
     sub = sub_tl
 
@@ -63,42 +67,63 @@ def monitor_state(game_states, input_state, timer_log, status, timer_max):
     timer_old = -1
     timer = cfg.game_data.timer.r_mem()
     data_index = 0
-    round_started = False
+    round_reset = False
 
-    while not status['die']:
+    while not env_status['die']:
         time.sleep(0.001)
         # トレーニングモードチェック
         tr_flag = cfg.game_data.tr_flag.r_mem()
 
         if tr_flag == 100 or tr_flag == 300:  # if in verses mode or training mode
             sub.function_key(data_index)
+            time.sleep(.001)
 
-            if not round_started:
-                mbtl_input.reset_round()
-                round_started = True
-                while cfg.game_data.timer.r_mem() > timer:
-                    time.sleep(.013)  # wait for round to reset
-            # タイマーチェック # timer check
-            timer = cfg.game_data.timer.r_mem()
+            while all(_v for _v in [eval_statuses[0]['eval_ready'], eval_statuses[0]['eval_ready']]):
+                if not round_reset:
+                    reset_timer = cfg.game_data.timer.r_mem()
+                    print("pre reset = {}".format(reset_timer))
+                    print("******************")
+                    while cfg.game_data.timer.r_mem() > reset_timer:
+                        print("no round started")
+                        print("pressed R")
+                        round_reset = True
+                        print("rest_timer={}".format(reset_timer))
+                        print("cur time={}".format(cfg.game_data.timer.r_mem()))
+                        mbtl_input.reset_round()
+                        print("waiting for reset")
+                        time.sleep(.001)  # wait for round to reset
+                    print("post reset={}".format(cfg.game_data.timer.r_mem()))
+                    timer_old = cfg.game_data.timer.r_mem()
+                    print("####################################")
+                else:
+                    pass
+                # タイマーチェック # timer check
+                timer = cfg.game_data.timer.r_mem()
 
-            # フレームの切り替わりを監視 # Monitor frame switching
-            if timer != timer_old and round_started:  # if new frame
-                if (timer < timer_old) or timer > timer_max:  # if timer is reset (new match)
-                    status['round_finished'] = True
-                    break
+                # フレームの切り替わりを監視 # Monitor frame switching
+                if timer != timer_old and round_reset:  # if new frame
+                    if (timer < timer_old) or timer > timer_max:  # if timer is reset (new match)
+                        env_status['round_done'] = True
+                        for _, eval_status in eval_statuses.items():
+                            eval_status['eval_ready'] = False
+                        round_reset = False
+                        print("round done.. eval not ready")
+                        break
 
-                timer_log.append(timer)
-                game_states.append({
-                    'game': get_state_data(cfg),
-                    'input': copy.deepcopy(input_state)
-                })
-                timer_old = timer  # store last time data was logged
-                time.sleep(0.004)  # データが安定するまで待機 # Wait for data to stabilize
+                    timer_log.append(timer)
+                    game_states.append({
+                        'game': get_state_data(cfg),
+                        'input': [copy.deepcopy(inp_) for _, inp_ in input_states.items()]
+                    })
+                    timer_old = timer  # store last time data was logged
+                    time.sleep(0.004)  # データが安定するまで待機 # Wait for data to stabilize
 
-                sub.situationCheck(data_index)  # 各種数値の取得 # Get various values
+                    sub.situationCheck(data_index)  # 各種数値の取得 # Get various values
 
-                sub.content_creation(data_index)  # 各種データ作成 # Various data creation
-    print("monitor dead")
+                    sub.content_creation(data_index)  # 各種データ作成 # Various data creation
+                else:
+                    pass
+    logger.debug("monitor dead")
 
 
 def store_states(states, timer_log):
@@ -115,24 +140,18 @@ def store_states(states, timer_log):
         f_writer.write(json.dumps(full_store))
 
 
-def capture_round():
+def capture_rounds(round_num):
     # create data structures
-    game_states_ = Manager().list()
-    timer_log_ = Manager().list()
-    status_ = Manager().dict()
-    status_['die'] = False
-    status_['round_finished'] = False
-
-    p1_input_dict = mbtl_input.create_p1_input_dict()
-
-    # generate_inputs = Event()
-    do_inputs = Event()
-    kill_eval = Event()
-    eval_ready = Event()
+    manager = Manager()
+    game_states_ = manager.list()
+    timer_log_ = manager.list()
+    env_status_ = manager.dict()
+    env_status_['die'] = False
+    env_status_['round_done'] = False
 
     # params
-    frames_per_observation = 10
-    reaction_delay = 5
+    frames_per_observation = 1
+    reaction_delay = 1
     learning_rate = 1e-5
     timer_max = config.settings['timer_max']
 
@@ -140,9 +159,7 @@ def capture_round():
     # generate_p1_inputs_process = Process(
     #     target=mbtl_input.random_inputs,
     #     args=(p1_input_dict, generate_inputs))
-    do_p1_inputs_process = Process(
-        target=mbtl_input.do_inputs,
-        args=(p1_input_dict, mbtl_input.p1_mapping_dict, do_inputs))
+
 
     # p2_input_dict = mbtl_input.create_p2_input_dict()
     # generate_p2_inputs_process = Process(
@@ -152,57 +169,103 @@ def capture_round():
     #     target=mbtl_input.do_inputs,
     #     args=(p2_input_dict, mbtl_input.p2_mapping_dict, do_inputs))
 
-    monitor_mbtl_process = Process(target=monitor_state,
-                                   args=(game_states_, p1_input_dict, timer_log_, status_, timer_max))
+    eval_statuses_ = dict()
+    eval_workers = dict()
+    kill_inputs_process = Event()
+    do_inputs_processes = dict()
+    input_states = Manager().dict()
 
-    module_eval_worker = EvalWorker(
-        game_states=game_states_,
-        die=kill_eval,
-        frames_per_evaluation=frames_per_observation,
-        reaction_delay=reaction_delay,
-        input_state=p1_input_dict,
-        state_format=state_format,
-        learning_rate=learning_rate,
-        player_idx=0,
-        frame_list=timer_log_,
-        worker_ready=eval_ready
-    )
+    for p in range(0, 2):
+        eval_statuses_[p] = manager.dict()
+        eval_statuses_[p]['kill_eval'] = False
+        eval_statuses_[p]['finish_round_eval'] = False
+        eval_statuses_[p]['storing_eval'] = False
+        eval_statuses_[p]['eval_ready'] = False
+
+        input_states[p] = manager.dict()
+        input_states[p] = mbtl_input.create_input_dict(input_states[p])
+
+        eval_w = EvalWorker(
+            game_states=game_states_,
+            env_status=env_status_,
+            eval_status=eval_statuses_[p],
+            frames_per_evaluation=frames_per_observation,
+            reaction_delay=reaction_delay,
+            input_state=input_states[p],
+            state_format=state_format,
+            learning_rate=learning_rate,
+            player_idx=p,
+            frame_list=timer_log_,
+        )
+        eval_workers[p] = eval_w
+
+        do_input_process = Process(
+            target=mbtl_input.do_inputs,
+            args=(input_states[p], mbtl_input.mapping_dicts[p], kill_inputs_process, env_status_))
+        do_inputs_processes[p] = do_input_process
+
+    monitor_mbtl_process = Process(target=monitor_state,
+                                   args=(game_states_, input_states, timer_log_, env_status_, eval_statuses_, timer_max))
 
     print("starting")
-    module_eval_worker.start()
-    while not eval_ready.is_set():
-        time.sleep(.001)
-    print("eval ready")
+    logger.debug("starting")
+    for _, eval_worker in eval_workers.items():
+        eval_worker.start()
+    logger.debug("eval started")
     monitor_mbtl_process.start()
-    print("monitored started")
-    do_p1_inputs_process.start()
-    print("do inputs started")
-
+    logger.debug("monitored started")
+    for _, inputs_process in do_inputs_processes.items():
+        inputs_process.start()
+    logger.debug("do inputs started")
     # generate_p2_inputs_process.start()
     # do_p2_inputs_process.start()
 
-    while not status_['round_finished']:
-        time.sleep(.13)
+    for r in range(0, round_num):
+        logger.debug("round={}".format(r))
+        while not env_status_['round_done']:
+            time.sleep(.001)
+        logger.debug("round done, notifying eval")
+        for _, eval_st in eval_statuses_.items():
+            eval_st['storing_eval'] = True
+        # wait for eval to finish storing
+        while all(_v for _v in [eval_statuses_[0]['storing_eval'], eval_statuses_[0]['storing_eval']]):
+            time.sleep(.001)
+        logger.debug("storing eval done")
+        logger.debug("clearing buffers")
+        del game_states_[:]  # clear stores
+        del timer_log_[:]  # clear stores
+        logger.debug("resetting round round")
+        env_status_['round_done'] = False
 
-    print("sending die")
-    status_['die'] = True
-    kill_eval.set()
-    do_inputs.set()
-    print("sent")
+    logger.debug("killing evals")
+    for _, eval_st in eval_statuses_.items():
+        eval_st['kill_eval'] = True
+    # status_['kill_eval'] = True
+    logger.debug("killing env")
+    env_status_['die'] = True
+    logger.debug("killing inputs processes")
+    kill_inputs_process.set()
+    logger.debug("sent")
 
-    print("eval worker join")
-    module_eval_worker.join()
-    print("monitor_mbtl_process join")
+    logger.debug("eval worker join")
+    for _, eval_w in eval_workers.items():
+        eval_w.join()
+    # module_eval_worker.join()
+    logger.debug("monitor_mbtl_process join")
     monitor_mbtl_process.join()
-    print("do_p1_inputs_process join")
-    do_p1_inputs_process.join()
+    logger.debug("do_p1_inputs_process join")
+    for _, eval_w in eval_workers.items():
+        eval_w.join()
+    for _, inputs_process in do_inputs_processes.items():
+        inputs_process.join()
+    # do_p1_inputs_process.join()
 
     # generate_inputs.set()
     # generate_p1_inputs_process.join()
     # generate_p2_inputs_process.join()
-    # print("generate_p2_inputs_process join")
+    # logger.debug("generate_p2_inputs_process join")
     # do_p2_inputs_process.join()
-    # print("do_p2_inputs_process join")
+    # logger.debug("do_p2_inputs_process join")
 
     print("stopped")
 
@@ -210,13 +273,11 @@ def capture_round():
 
 
 def collect_data(capture_count):
-    for c in range(0, capture_count):
-        print("round={}".format(c))
-        capture_round()
+    capture_rounds(capture_count)
 
 
 if __name__ == "__main__":
     mp.set_start_method('spawn')
-    collect_data(1)
+    collect_data(2)
 
     # test_no_inputs()

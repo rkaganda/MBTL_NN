@@ -21,8 +21,9 @@ def _handle_list(ob: list):
     return [keys_to_strings(v) for v in ob]
 
 
-def store_eval_output(normalized_states, states, model_output, state_format):
+def store_eval_output(normalized_states, states, model_output, state_format, player_idx):
     path = "data/eval/{}".format(config.settings['run_name'])
+    datetime_str = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
 
     all_data = {
         "normalized_states": normalized_states,
@@ -30,10 +31,10 @@ def store_eval_output(normalized_states, states, model_output, state_format):
         "model_output": copy.deepcopy(model_output),
         "state_format": state_format
     }
-    Path("{}".format(path)).mkdir(parents=True, exist_ok=True)
-    Path("{}/model/".format(path)).mkdir(parents=True, exist_ok=True)
+    Path("{}/evals/{}".format(path, player_idx)).mkdir(parents=True, exist_ok=True)
+    Path("{}/model/{}".format(path, player_idx)).mkdir(parents=True, exist_ok=True)
 
-    with open("{}/eval_{}.json".format(path, datetime.datetime.now().strftime("%Y%m%d_%H%M%S")), 'a') as f_writer:
+    with open("{}/evals/{}/eval_{}.json".format(path, player_idx, datetime_str),'a') as f_writer:
         f_writer.write(json.dumps(all_data))
 
 
