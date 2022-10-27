@@ -110,56 +110,57 @@ def train(model, optim, criterion, data):
     optim.step()  # Updates the network weights based on the calculated gradients
 
 
-run_name = 'p1_x_posi_test_1'
-eval_path = "data/eval/{}".format(run_name)
-learning_rate = 1e-5
-epochs = 100
-load_model_file = '20221022_003718'
-dt_str = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+def main():
+    run_name = 'p1_x_posi_test_1'
+    eval_path = "data/eval/{}".format(run_name)
+    learning_rate = 1e-5
+    epochs = 100
+    load_model_file = '20221022_003718'
+    dt_str = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
 
-print("device={}".format(device))
+    print("device={}".format(device))
 
-print(torch.cuda.current_device())
-print(torch.cuda.device(0))
-print(torch.cuda.get_device_name(0))
+    print(torch.cuda.current_device())
+    print(torch.cuda.device(0))
+    print(torch.cuda.get_device_name(0))
 
 
-reward_data = load_reward_data()
+    reward_data = load_reward_data()
 
-input_size = len(reward_data['input'][0])
-output_size = len(reward_data['output'][0])
+    input_size = len(reward_data['input'][0])
+    output_size = len(reward_data['output'][0])
 
-model, optim = setup_model(input_size, output_size, learning_rate)
-criterion = nn.CrossEntropyLoss(reduction='none')
-model.to(device)
+    model, optim = setup_model(input_size, output_size, learning_rate)
+    criterion = nn.CrossEntropyLoss(reduction='none')
+    model.to(device)
 
-print(model)
-print(optim)
+    print(model)
+    print(optim)
 
-dataset = create_dataset(reward_data)
+    dataset = create_dataset(reward_data)
 
-# N = len(dataset)
-# data_sampler = td.sampler.RandomSampler(range(N))
-# dataloader = td.DataLoader(dataset, sampler=data_sampler, batch_size=batch_size)
-train_loader = torch.utils.data.DataLoader(dataset, batch_size=64, shuffle=True)
+    # N = len(dataset)
+    # data_sampler = td.sampler.RandomSampler(range(N))
+    # dataloader = td.DataLoader(dataset, sampler=data_sampler, batch_size=batch_size)
+    train_loader = torch.utils.data.DataLoader(dataset, batch_size=64, shuffle=True)
 
-# with torch.profiler.profile(
-#         schedule=torch.profiler.schedule(wait=1, warmup=1, active=3, repeat=2),
-#         on_trace_ready=torch.profiler.tensorboard_trace_handler('../../logs/{}_{}'.format(dt_str, run_name)),
-#         record_shapes=True,
-#         profile_memory=True,
-#         with_stack=True,
-#         activities=[
-#             torch.profiler.ProfilerActivity.CPU,
-#             torch.profiler.ProfilerActivity.CUDA,
-#         ]
-# ) as prof:
-for epoch in tqdm(range(0, epochs)):
-    for step, batch_data in enumerate(train_loader):
-        train(model, optim, criterion, batch_data)
-            # train(batch_data)
-            #prof.step()  # Need to call this at the end of each step to notify profiler of steps' boundary.
+    # with torch.profiler.profile(
+    #         schedule=torch.profiler.schedule(wait=1, warmup=1, active=3, repeat=2),
+    #         on_trace_ready=torch.profiler.tensorboard_trace_handler('../../logs/{}_{}'.format(dt_str, run_name)),
+    #         record_shapes=True,
+    #         profile_memory=True,
+    #         with_stack=True,
+    #         activities=[
+    #             torch.profiler.ProfilerActivity.CPU,
+    #             torch.profiler.ProfilerActivity.CUDA,
+    #         ]
+    # ) as prof:
+    for epoch in tqdm(range(0, epochs)):
+        for step, batch_data in enumerate(train_loader):
+            train(model, optim, criterion, batch_data)
+                # train(batch_data)
+                #prof.step()  # Need to call this at the end of each step to notify profiler of steps' boundary.
 
-print("{} done".format(dt_str))
+    print("{} done".format(dt_str))
 
-save_model(model, optim)
+    save_model(model, optim)

@@ -3,11 +3,16 @@ import ctypes
 import random
 from ctypes import wintypes
 import time
+import logging
 
 # from torch.multiprocessing import Process, Manager, Event
 from multiprocessing import Process, Manager, Event
 
 import config
+
+logging.basicConfig(filename='logs/train.log', level=logging.DEBUG, format='%(asctime)s %(levelname)-8s %(message)s')
+logger = logging.getLogger(__name__)
+
 
 user32 = ctypes.WinDLL('user32', use_last_error=True)
 
@@ -143,6 +148,10 @@ mapping_dicts[1]['b'] = 0x4E  # P2 B # n
 mapping_dicts[1]['c'] = 0x4D  # P2 C # m
 mapping_dicts[1]['d'] = 0xBC  # P2 D # ,
 
+input_pressed = dict()
+for k_ in config.settings['valid_inputs']:
+    input_pressed[k_] = False
+
 
 def create_input_dict(input_dict):
     for k in config.settings['valid_inputs']:
@@ -161,15 +170,14 @@ def create_p2_input_dict():
 
 
 def do_inputs(input_dict, mapping_dict, die, env_status):
-    input_pressed = copy.deepcopy(input_dict)
     while not die.is_set():
         if not env_status['round_done']:
             time.sleep(.012)
             for k in input_dict.keys():
-                if input_dict[k] and not input_pressed[k]:
+                if input_dict[k]:
                     PressKey(mapping_dict[k])
                     input_pressed[k] = True
-                elif input_pressed[k] and not input_dict[k]:
+                elif input_pressed[k]:
                     ReleaseKey(mapping_dict[k])
                     input_pressed[k] = False
         else:
@@ -202,6 +210,7 @@ def reset_round():
         for k in mapping_dict.values():
             time.sleep(.001)
             ReleaseKey(k)
+            input_pressed[k] = False
 
     PressKey(0x53)  # s # down
     time.sleep(.001)

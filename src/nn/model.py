@@ -49,7 +49,7 @@ def load_model(model, optimizer, player_idx):
 
 
 def save_model(model, optim, player_idx):
-    path = "data/eval/{}/model/".format(config.settings['run_name'])
+    path = "data/eval/{}/model/{}/".format(config.settings['run_name'], player_idx)
     time_str = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
 
     torch.save(model.state_dict(), "{}/{}.model".format(path, time_str))

@@ -12,9 +12,20 @@ valid_inputs:
 
 model_file:
 
-timer_max: 1000
+count_save: 2
+
+timer_max: 200
 
 log_level: DEBUG
 
-save_model: False
+save_model: True
 
+reward_columns:
+  0:
+    "p_0_health": 1
+    "p_1_health": -1
+  1:
+    "p_0_health": -1
+    "p_1_health": 1
+
+reward_falloff: 15

@@ -25,6 +25,10 @@ def store_eval_output(normalized_states, states, model_output, state_format, pla
     path = "data/eval/{}".format(config.settings['run_name'])
     datetime_str = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
 
+    states = copy.deepcopy(states)
+    for idx, v in enumerate(states):
+        states[idx]['input'] = states[idx]['input'][player_idx]
+
     all_data = {
         "normalized_states": normalized_states,
         "states": copy.deepcopy(states),

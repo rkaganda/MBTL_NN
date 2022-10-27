@@ -26,7 +26,12 @@ def create_eval_df(file_dict):
                 row["{}".format(key)] = item
         d_[frame_idx] = row
 
+    # JSON(d_)
+
     eval_df = pd.DataFrame.from_dict(d_, orient='index')
+
+    # display(eval_df.head())
+    # display(eval_df.tail())
 
     return eval_df
 
@@ -40,7 +45,12 @@ def create_norm_state_df(file_dict):
             row[idx] = value
         norm_dict[index] = row
 
+    # JSON(norm_dict)
+
     norm_state_df = pd.DataFrame.from_dict(norm_dict, orient='index')
+
+    # display(norm_state_df.head())
+    # display(norm_state_df.tail())
 
     return norm_state_df
 
@@ -53,6 +63,7 @@ def calcuate_actual_state_df(file_dict):
         for player_id, player_states in item['game'].items():
             for attrib, value in player_states.items():
                 row["p_{}_{}".format(player_id, attrib)] = value
+        print("item['input']={}".format(item['input']))
         for p_input, value in item['input'].items():
             row["input_{}".format(p_input)] = value
         actual_state_dict[index] = row
@@ -64,7 +75,7 @@ def calcuate_actual_state_df(file_dict):
 
 def calculate_reformed_input_df(eval_df, norm_state_df):
     input_windows = list()
-    for jdx, row in eval_df.iterrows():
+    for idx, row in eval_df.iterrows():
         input_window = list()
         for idx in range(int(row['window_0']), int(row['window_1']) + 1):
             input_window = input_window + norm_state_df.iloc[idx].to_list()
@@ -198,18 +209,8 @@ def generate_json_from_in_out_df(output_with_input_and_reward):
     return json_dict
 
 
-def main():
-    run = "p1_vs_cpu_heath"
-
-    eval_path = "data/eval/{}/evals".format(run)
-    reward_path = "data/eval/{}/reward".format(run)
-
-    reward_columns = {
-        "p_0_health": -1,
-        "p_1_health": 1
-    }
-    falloff = 15
-
+def generate_rewards(eval_path, reward_path, reward_columns, falloff):
+    print(reward_path)
     Path("{}".format(reward_path)).mkdir(parents=True, exist_ok=True)
     onlyfiles = [f for f in listdir(eval_path) if isfile(join(eval_path, f))]
 
@@ -224,8 +225,28 @@ def main():
                 f_writer.write(json.dumps(file_json))
 
 
-if __name__ == "__main__":
-    main()
+def main():
+    run = "p1_vs_cpu_heath"
 
+    eval_path = "eval/{}/evals".format(run)
+    reward_path = "eval/{}/reward".format(run)
 
+    reward_columns = {
+        "p_0_health": 1,
+        "p_1_health": -1
+    }
+    falloff = 15
 
+    Path("{}".format(reward_path)).mkdir(parents=True, exist_ok=True)
+    onlyfiles = [f for f in listdir(eval_path) if isfile(join(eval_path, f))]
+
+    for file in onlyfiles:
+        if file.startswith('eval_'):
+            reward_file = file.replace('eval_', 'reward_')
+            file_name = "{}/{}".format(eval_path, file)
+            df = caclulate_reward_from_eval(file_name, reward_columns, falloff)
+            file_json = generate_json_from_in_out_df(df)
+            # display(JSON(file_json))
+
+            with open("{}/{}".format(reward_path, reward_file), 'w') as f_writer:
+                f_writer.write(json.dumps(file_json))

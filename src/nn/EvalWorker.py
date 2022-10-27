@@ -13,6 +13,7 @@ import mbtl_input
 import nn.model as model
 import nn.eval_util as eval_util
 import config
+import calc_reward
 
 logging.basicConfig(filename='./logs/train.log', level=logging.DEBUG, format='%(asctime)s %(levelname)-8s %(message)s')
 logger = logging.getLogger(__name__)
@@ -39,6 +40,8 @@ class EvalWorker(mp.Process):
 
         self.model = None
         self.optimizer = None
+
+        self.run_count = 1
 
     # normalize the state attributes between 0, 1 using precalculated min max
     def normalize_state(self, state):
@@ -102,6 +105,19 @@ class EvalWorker(mp.Process):
             self.player_idx
         )
 
+        if config.settings['save_model'] and (self.run_count % config.settings['count_save']) == 0:
+            print("epoch cleanup...")
+            self.reward_train()
+            model.save_model(self.model, self.optimizer, self.player_idx)
+
+    def reward_train(self):
+        calc_reward.generate_rewards(
+            reward_path="data/eval/{}/reward/{}".format(config.settings['run_name'], self.player_idx),
+            eval_path="data/eval/{}/evals/{}".format(config.settings['run_name'], self.player_idx),
+            reward_columns=config.settings['reward_columns'][self.player_idx],
+            falloff=config.settings['reward_falloff']
+        )
+
     def run(self):
         try:
             self.setup_model()
@@ -148,7 +164,11 @@ class EvalWorker(mp.Process):
                             prob = torch.bernoulli(detached_out).numpy()
 
                             for idx, key in enumerate(self.state_format['input']):
-                                self.input_state[key] = 1 if prob[idx] == 1 else 0
+                                if idx == self.player_idx:
+                                    self.input_state[key] = 1
+                                else:
+                                    self.input_state[key] = 0
+                                #  self.input_state[key] = 1 if prob[idx] == 1 else 0
 
                             # store model output
                             model_output[last_evaluated_index] = {
@@ -171,13 +191,12 @@ class EvalWorker(mp.Process):
                     self.eval_status['eval_ready'] = False
                     logger.debug("{} stopping eval".format(self.player_idx))
                     self.round_cleanup(normalized_states, model_output)
-                    if config.settings['save_model']:
-                        model.save_model(self.model, self.optimizer, self.player_idx)
                     did_store = True
                     del normalized_states[:]
                     model_output.clear()
                     last_normalized_index = 0
                     last_evaluated_index = 0
+                    self.run_count = self.run_count + 1
                     logger.debug("{} finished cleanup".format(self.player_idx))
                     self.eval_status['storing_eval'] = False  # finished storing eval
         except Exception as identifier:
