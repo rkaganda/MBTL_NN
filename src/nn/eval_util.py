@@ -6,20 +6,6 @@ from pathlib import Path
 import config
 import torch
 
-@singledispatch
-def keys_to_strings(ob):
-    return ob
-
-
-@keys_to_strings.register
-def _handle_dict(ob: dict):
-    return {str(k): keys_to_strings(v) for k, v in ob.items()}
-
-
-@keys_to_strings.register
-def _handle_list(ob: list):
-    return [keys_to_strings(v) for v in ob]
-
 
 def store_eval_output(normalized_states, states, model_output, state_format, player_idx):
     path = "data/eval/{}".format(config.settings['run_name'])

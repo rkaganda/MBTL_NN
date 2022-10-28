@@ -210,7 +210,6 @@ def reset_round():
         for k in mapping_dict.values():
             time.sleep(.001)
             ReleaseKey(k)
-            input_pressed[k] = False
 
     PressKey(0x53)  # s # down
     time.sleep(.001)

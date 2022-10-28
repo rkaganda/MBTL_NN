@@ -3,6 +3,11 @@ import json
 from os import listdir
 from os.path import isfile, join
 from pathlib import Path
+import datetime
+import logging
+
+logging.basicConfig(filename='./logs/train.log', level=logging.DEBUG, format='%(asctime)s %(levelname)-8s %(message)s')
+logger = logging.getLogger(__name__)
 
 
 def load_file(file_path):
@@ -63,7 +68,6 @@ def calcuate_actual_state_df(file_dict):
         for player_id, player_states in item['game'].items():
             for attrib, value in player_states.items():
                 row["p_{}_{}".format(player_id, attrib)] = value
-        print("item['input']={}".format(item['input']))
         for p_input, value in item['input'].items():
             row["input_{}".format(p_input)] = value
         actual_state_dict[index] = row
@@ -152,6 +156,8 @@ def calculate_reward_df(merged_eval_actual_state_df, reward_columns, falloff):
         (merged_eval_actual_state_df['reward_total'] - merged_eval_actual_state_df['reward_total'].mean()) / \
         merged_eval_actual_state_df['reward_total'].std()
 
+    merged_eval_actual_state_df['reward_total_norm'].fillna(0, inplace=True)
+
     return merged_eval_actual_state_df
 
 
@@ -176,6 +182,8 @@ def caclulate_reward_from_eval(file_path, reward_columns, falloff):
     print("reward_columns={}".format(reward_columns))
     print("falloff={}".format(falloff))
     file_dict = load_file(file_path)
+
+    datetime_str = datetime.datetime.now().strftime("%Y%m%d_%H%M%S_%f")
 
     eval_df = create_eval_df(file_dict)
 
@@ -215,14 +223,17 @@ def generate_rewards(eval_path, reward_path, reward_columns, falloff):
     onlyfiles = [f for f in listdir(eval_path) if isfile(join(eval_path, f))]
 
     for file in onlyfiles:
-        if file.startswith('eval_'):
-            reward_file = file.replace('eval_', 'reward_')
-            file_name = "{}/{}".format(eval_path, file)
-            df = caclulate_reward_from_eval(file_name, reward_columns, falloff)
-            file_json = generate_json_from_in_out_df(df)
+        try:
+            if file.startswith('eval_'):
+                reward_file = file.replace('eval_', 'reward_')
+                file_name = "{}/{}".format(eval_path, file)
+                df = caclulate_reward_from_eval(file_name, reward_columns, falloff)
+                file_json = generate_json_from_in_out_df(df)
 
-            with open("{}/{}".format(reward_path, reward_file), 'w') as f_writer:
-                f_writer.write(json.dumps(file_json))
+                with open("{}/{}".format(reward_path, reward_file), 'w') as f_writer:
+                    f_writer.write(json.dumps(file_json))
+        except Exception as e:
+            logger.debug("file_name={}/{}".format(eval_path, file))
 
 
 def main():

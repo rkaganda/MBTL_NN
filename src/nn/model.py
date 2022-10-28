@@ -5,6 +5,7 @@ import torch.utils.data as td
 from torch.autograd import Variable
 import config
 import datetime
+from pathlib import Path
 
 
 class Model(nn.Module):
@@ -50,6 +51,9 @@ def load_model(model, optimizer, player_idx):
 
 def save_model(model, optim, player_idx):
     path = "data/eval/{}/model/{}/".format(config.settings['run_name'], player_idx)
+
+    Path(path).mkdir(parents=True, exist_ok=True)
+
     time_str = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
 
     torch.save(model.state_dict(), "{}/{}.model".format(path, time_str))

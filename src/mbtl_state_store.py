@@ -81,20 +81,11 @@ def monitor_state(game_states, input_states, timer_log, env_status, eval_statuse
             while all(_v for _v in [eval_statuses[0]['eval_ready'], eval_statuses[0]['eval_ready']]):
                 if not round_reset:
                     reset_timer = cfg.game_data.timer.r_mem()
-                    print("pre reset = {}".format(reset_timer))
-                    print("******************")
                     while cfg.game_data.timer.r_mem() > reset_timer:
-                        print("no round started")
-                        print("pressed R")
                         round_reset = True
-                        print("rest_timer={}".format(reset_timer))
-                        print("cur time={}".format(cfg.game_data.timer.r_mem()))
                         mbtl_input.reset_round()
-                        print("waiting for reset")
                         time.sleep(.001)  # wait for round to reset
-                    print("post reset={}".format(cfg.game_data.timer.r_mem()))
                     timer_old = cfg.game_data.timer.r_mem()
-                    print("####################################")
                 else:
                     pass
                 # タイマーチェック # timer check
@@ -107,14 +98,12 @@ def monitor_state(game_states, input_states, timer_log, env_status, eval_statuse
                         for _, eval_status in eval_statuses.items():
                             eval_status['eval_ready'] = False
                         round_reset = False
-                        print("round done.. eval not ready")
+                        print("round done.. stopping eval")
                         break
-                    # temp input
-                    inputs = [{'2': 1, '4': 0, '8': 0, '6': 0, 'a': 0, 'b': 0, 'c': 0, 'd': 0}, {'2': 0, '4': 1, '8': 0, '6': 0, 'a': 0, 'b': 0, 'c': 0, 'd': 0}]
                     timer_log.append(timer)
                     game_states.append({
                         'game': get_state_data(cfg),
-                        'input': inputs# [copy.deepcopy(inp_) for _, inp_ in input_states.items()]
+                        'input': [copy.deepcopy(inp_) for _, inp_ in input_states.items()]
                     })
                     timer_old = timer  # store last time data was logged
                     time.sleep(0.004)  # データが安定するまで待機 # Wait for data to stabilize
@@ -151,9 +140,9 @@ def capture_rounds(round_num):
     env_status_['round_done'] = False
 
     # params
-    frames_per_observation = 1
-    reaction_delay = 1
-    learning_rate = 1e-5
+    frames_per_observation = int(config.settings['frames_per_observation'])
+    reaction_delay = int(config.settings['reaction_delay'])
+    learning_rate = float(config.settings['learning_rate'])
     timer_max = config.settings['timer_max']
 
     eval_statuses_ = dict()
@@ -161,7 +150,6 @@ def capture_rounds(round_num):
     kill_inputs_process = Event()
     do_inputs_processes = dict()
     input_states = Manager().dict()
-    reset_round = Event()
 
     for p in range(0, 2):
         eval_statuses_[p] = manager.dict()
@@ -253,6 +241,6 @@ def collect_data(capture_count):
 
 if __name__ == "__main__":
     mp.set_start_method('spawn')
-    collect_data(4)
+    collect_data(1)
 
     # test_no_inputs()

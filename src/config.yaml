@@ -9,12 +9,17 @@ valid_inputs:
   - "b"
   - "c"
   - "d"
+frames_per_observation: 5
+reaction_delay: 20
+learning_rate: 1e-5
+
 
 model_file:
 
-count_save: 2
+count_save: 20
+epochs: 40
 
-timer_max: 200
+timer_max: 9999999
 
 log_level: DEBUG
 

@@ -14,6 +14,7 @@ import nn.model as model
 import nn.eval_util as eval_util
 import config
 import calc_reward
+import train_model
 
 logging.basicConfig(filename='./logs/train.log', level=logging.DEBUG, format='%(asctime)s %(levelname)-8s %(message)s')
 logger = logging.getLogger(__name__)
@@ -87,6 +88,7 @@ class EvalWorker(mp.Process):
             print("loaded model")
         else:
             print("fresh model")
+            model.save_model(self.model, self.optimizer, self.player_idx)
 
         self.model.to(device)
         self.model.eval()
@@ -111,12 +113,15 @@ class EvalWorker(mp.Process):
             model.save_model(self.model, self.optimizer, self.player_idx)
 
     def reward_train(self):
+        reward_path = "data/eval/{}/reward/{}".format(config.settings['run_name'], self.player_idx)
+        eval_path = "data/eval/{}/evals/{}".format(config.settings['run_name'], self.player_idx)
         calc_reward.generate_rewards(
-            reward_path="data/eval/{}/reward/{}".format(config.settings['run_name'], self.player_idx),
-            eval_path="data/eval/{}/evals/{}".format(config.settings['run_name'], self.player_idx),
+            reward_path=reward_path,
+            eval_path=eval_path,
             reward_columns=config.settings['reward_columns'][self.player_idx],
             falloff=config.settings['reward_falloff']
         )
+        train_model.train_model(reward_path, self.model, self.optimizer, config.settings['epochs'])
 
     def run(self):
         try:
@@ -161,14 +166,15 @@ class EvalWorker(mp.Process):
                                 out_tensor = self.model(in_tensor)
 
                             detached_out = out_tensor.detach().cpu()
-                            prob = torch.bernoulli(detached_out).numpy()
+                            try:
+                                prob = torch.bernoulli(detached_out).numpy()
+                            except RuntimeError as e:
+                                print("in_tensor={}".format(in_tensor))
+                                print("detached_out={}".format(detached_out))
+                                raise e
 
                             for idx, key in enumerate(self.state_format['input']):
-                                if idx == self.player_idx:
-                                    self.input_state[key] = 1
-                                else:
-                                    self.input_state[key] = 0
-                                #  self.input_state[key] = 1 if prob[idx] == 1 else 0
+                                self.input_state[key] = 1 if prob[idx] == 1 else 0
 
                             # store model output
                             model_output[last_evaluated_index] = {
@@ -186,7 +192,7 @@ class EvalWorker(mp.Process):
                             last_evaluated_index = last_evaluated_index + 1
                     else:
                         pass  # no states yet
-                if not did_store:
+                if not did_store and len(normalized_states) > 0:
                     logger.debug("{} eval cleanup".format(self.player_idx))
                     self.eval_status['eval_ready'] = False
                     logger.debug("{} stopping eval".format(self.player_idx))
