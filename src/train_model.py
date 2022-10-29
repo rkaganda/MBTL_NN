@@ -2,6 +2,7 @@ import torch
 import torch.nn as nn
 import torch.utils.data as td
 from torch.autograd import Variable
+from torch.utils.tensorboard import SummaryWriter
 
 import json
 import numpy as np
@@ -91,8 +92,9 @@ def create_dataset(data):
     return td.TensorDataset(input_tensor, output_tensor, reward_tensor)
 
 
-def train(model, optim, criterion, data):
+def train(model, optim, criterion, data, batch_size):
     model.train()
+    train_loss = 0
 
     observation = Variable(data[0]).to(device)
     action_out = model(observation).to(device)
@@ -109,9 +111,16 @@ def train(model, optim, criterion, data):
     loss.backward()
     optim.step()  # Updates the network weights based on the calculated gradients
 
+    train_loss += loss.item() * batch_size
+
+    return train_loss
+
 
 def train_model(reward_path, model, optim, epochs):
+    writer = SummaryWriter(log_dir="./logs")
+
     reward_data = load_reward_data(reward_path)
+    batch_size = 64
 
     criterion = nn.CrossEntropyLoss(reduction='none')
     criterion.to(device)
@@ -122,11 +131,19 @@ def train_model(reward_path, model, optim, epochs):
 
     dataset = create_dataset(reward_data)
 
-    train_loader = torch.utils.data.DataLoader(dataset, batch_size=64, shuffle=True)
+    train_loader = torch.utils.data.DataLoader(dataset, batch_size=batch_size, shuffle=True)
+
+    total_loss = 0
+    step_count = 0
 
     for epoch in tqdm(range(0, epochs)):
         for step, batch_data in enumerate(train_loader):
-            train(model, optim, criterion, batch_data)
+            train_loss = train(model, optim, criterion, batch_data, batch_size)
+            total_loss += train_loss
+            step_count = step
+        total_loss = total_loss / (batch_size*step_count)
+        writer.add_scalar("Loss/train", total_loss, epoch)
+        writer.flush()
 
 
 # def main():
