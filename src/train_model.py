@@ -15,6 +15,8 @@ from tqdm import tqdm
 import time
 import datetime
 
+import config
+
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
 
@@ -54,7 +56,6 @@ device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 #         torch.load("{}/{}/model/{}.model".format(path, run_name, load_model_file),
 #                    map_location=lambda storage, loc: storage))
 #     optimizer.load_state_dict(torch.load("{}/{}/model/{}.optim".format(path, run_name, load_model_file)))
-
 
 def load_reward_data(reward_path):
     onlyfiles = [f for f in listdir(reward_path) if isfile(join(reward_path, f))]
@@ -116,9 +117,7 @@ def train(model, optim, criterion, data, batch_size):
     return train_loss
 
 
-def train_model(reward_path, model, optim, epochs):
-    writer = SummaryWriter(log_dir="./logs")
-
+def train_model(reward_path, model, optim, epochs, episode_num):
     reward_data = load_reward_data(reward_path)
     batch_size = 64
 
@@ -142,8 +141,6 @@ def train_model(reward_path, model, optim, epochs):
             total_loss += train_loss
             step_count = step
         total_loss = total_loss / (batch_size*step_count)
-        writer.add_scalar("Loss/train", total_loss, epoch)
-        writer.flush()
 
 
 # def main():

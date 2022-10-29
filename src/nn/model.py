@@ -58,7 +58,6 @@ class Model(nn.Module):
         return self.activation(out)
 
 
-
 def setup_model(frames_per_observation, input_state_size, state_state_size, learning_rate):
     input_layer_size = frames_per_observation*(input_state_size+(state_state_size*2))
     model = Model(input_layer_size, input_state_size)
@@ -79,8 +78,8 @@ def load_model(model, optimizer, player_idx):
     print("loaded model = {}".format("{}/{}.model".format(path, config.settings['model_file'])))
 
 
-def save_model(model, optim, player_idx):
-    path = "data/eval/{}/model/{}/".format(config.settings['run_name'], player_idx)
+def save_model(model, optim, player_idx, episode_num):
+    path = "data/eval/{}/model/{}/{}/".format(config.settings['run_name'], player_idx, episode_num)
 
     Path(path).mkdir(parents=True, exist_ok=True)
 

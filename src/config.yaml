@@ -1,5 +1,5 @@
-run_name: "log_Test"
-minmax_file: "data/test_minmax.json"
+run_name: "no_delay_neg_p1"
+minmax_file: "data/new_minmax.json"
 valid_inputs:
   - "2"
   - "4"
@@ -9,14 +9,14 @@ valid_inputs:
   - "b"
   - "c"
   - "d"
-frames_per_observation: 5
-reaction_delay: 20
+frames_per_observation: 10
+reaction_delay: 1
 learning_rate: 1e-5
 
 
 model_file:
 
-count_save: 10
+count_save: 20
 epochs: 1
 
 timer_max: 9999999
@@ -31,6 +31,6 @@ reward_columns:
     "p_1_health": -1
   1:
     "p_0_health": -1
-    "p_1_health": 1
+    "p_1_health": 1.5
 
 reward_falloff: 15

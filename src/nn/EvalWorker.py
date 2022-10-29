@@ -1,6 +1,7 @@
 import time
 import logging
 import traceback
+import datetime
 
 import multiprocessing as mp
 import numpy as np
@@ -41,6 +42,7 @@ class EvalWorker(mp.Process):
 
         self.model = None
         self.optimizer = None
+        self.episode_number = 0
 
         self.run_count = 1
 
@@ -88,7 +90,7 @@ class EvalWorker(mp.Process):
             print("loaded model")
         else:
             print("fresh model")
-            model.save_model(self.model, self.optimizer, self.player_idx)
+            model.save_model(self.model, self.optimizer, self.player_idx, episode_num=-1)
 
         self.model.to(device)
         self.model.eval()
@@ -105,24 +107,26 @@ class EvalWorker(mp.Process):
             self.states,
             model_output,
             self.state_format,
-            self.player_idx
+            self.player_idx,
+            self.episode_number,
         )
 
         if config.settings['save_model'] and (self.run_count % config.settings['count_save']) == 0:
             print("epoch cleanup...")
             self.reward_train()
-            model.save_model(self.model, self.optimizer, self.player_idx)
+            model.save_model(self.model, self.optimizer, self.player_idx, episode_num=self.episode_number)
+            self.episode_number += 1
 
     def reward_train(self):
-        reward_path = "data/eval/{}/reward/{}".format(config.settings['run_name'], self.player_idx)
-        eval_path = "data/eval/{}/evals/{}".format(config.settings['run_name'], self.player_idx)
+        reward_path = "data/eval/{}/reward/{}/{}".format(config.settings['run_name'], self.player_idx, self.episode_number)
+        eval_path = "data/eval/{}/evals/{}/{}".format(config.settings['run_name'], self.player_idx, self.episode_number)
         calc_reward.generate_rewards(
             reward_path=reward_path,
             eval_path=eval_path,
             reward_columns=config.settings['reward_columns'][self.player_idx],
             falloff=config.settings['reward_falloff']
         )
-        train_model.train_model(reward_path, self.model, self.optimizer, config.settings['epochs'])
+        train_model.train_model(reward_path, self.model, self.optimizer, config.settings['epochs'], self.episode_number)
 
     def run(self):
         try:

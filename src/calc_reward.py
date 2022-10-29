@@ -152,9 +152,15 @@ def calculate_reward_df(merged_eval_actual_state_df, reward_columns, falloff):
         merged_eval_actual_state_df['reward_total'] = merged_eval_actual_state_df['reward_total'] + \
                                                       merged_eval_actual_state_df[r]
 
-    merged_eval_actual_state_df['reward_total_norm'] = \
-        (merged_eval_actual_state_df['reward_total'] - merged_eval_actual_state_df['reward_total'].mean()) / \
-        merged_eval_actual_state_df['reward_total'].std()
+    # merged_eval_actual_state_df['reward_total_norm'] = \
+    #     (merged_eval_actual_state_df['reward_total'] - merged_eval_actual_state_df['reward_total'].mean()) / \
+    #     merged_eval_actual_state_df['reward_total'].std()
+
+    merged_eval_actual_state_df['reward_total_norm'] = merged_eval_actual_state_df['reward_total']
+
+    # merged_eval_actual_state_df['reward_total_norm'] = \
+    #     (merged_eval_actual_state_df['reward_total'] - merged_eval_actual_state_df['reward_total'].min())/ \
+    #     (merged_eval_actual_state_df['reward_total'].max() - merged_eval_actual_state_df['reward_total'].min())
 
     merged_eval_actual_state_df['reward_total_norm'].fillna(0, inplace=True)
 
@@ -179,8 +185,6 @@ def merge_input_with_reward(merged_eval_actual_state_df, reformed_input_df, rewa
 
 
 def caclulate_reward_from_eval(file_path, reward_columns, falloff):
-    print("reward_columns={}".format(reward_columns))
-    print("falloff={}".format(falloff))
     file_dict = load_file(file_path)
 
     datetime_str = datetime.datetime.now().strftime("%Y%m%d_%H%M%S_%f")
