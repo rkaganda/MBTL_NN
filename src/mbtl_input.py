@@ -220,3 +220,18 @@ def reset_round():
     time.sleep(.001)
     ReleaseKey(0x53)  # s # down
     # time.sleep(.001)
+
+
+def test_inputs():
+    d = mapping_dicts[1]
+    time.sleep(5)
+    for _, k in d.items():
+        print(_)
+        time.sleep(2)
+        PressKey(k)  # s # down
+        time.sleep(.1)
+        ReleaseKey(k)  # r
+        print("----")
+
+if __name__=="__main__":
+    test_inputs()
