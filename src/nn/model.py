@@ -19,6 +19,8 @@ class Model(nn.Module):
             nn.ReLU(),
             nn.Linear(512, 512),
             nn.ReLU(),
+            nn.Linear(512, 512),
+            nn.ReLU(),
             nn.Linear(512, output_size),
         )
         self.activation = torch.nn.Sigmoid()
