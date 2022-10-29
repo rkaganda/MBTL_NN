@@ -78,7 +78,7 @@ def monitor_state(game_states, input_states, timer_log, env_status, eval_statuse
             sub.function_key(data_index)
             time.sleep(.001)
 
-            while all(_v for _v in [eval_statuses[0]['eval_ready'], eval_statuses[0]['eval_ready']]):
+            while all([_v['eval_ready'] for _, _v in eval_statuses.items()]):
                 if not round_reset:
                     reset_timer = cfg.game_data.timer.r_mem()
                     while cfg.game_data.timer.r_mem() > reset_timer:
@@ -151,7 +151,7 @@ def capture_rounds(round_num):
     do_inputs_processes = dict()
     input_states = Manager().dict()
 
-    for p in range(0, 2):
+    for p in range(0, 1):
         eval_statuses_[p] = manager.dict()
         eval_statuses_[p]['kill_eval'] = False  # eval die
         eval_statuses_[p]['storing_eval'] = False  # eval storing data
@@ -194,6 +194,7 @@ def capture_rounds(round_num):
     logger.debug("do inputs started")
 
     for r in range(0, round_num):
+        print("round={}".format(r))
         logger.debug("round={}".format(r))
         while not env_status_['round_done']:
             time.sleep(.001)
@@ -201,7 +202,7 @@ def capture_rounds(round_num):
         for _, eval_st in eval_statuses_.items():
             eval_st['storing_eval'] = True
         # wait for eval to finish storing
-        while all(_v for _v in [eval_statuses_[0]['storing_eval'], eval_statuses_[0]['storing_eval']]):
+        while all([not _v['eval_ready'] for _, _v in eval_statuses_.items()]):
             time.sleep(.001)
         logger.debug("storing eval done")
         logger.debug("clearing buffers")
@@ -241,6 +242,6 @@ def collect_data(capture_count):
 
 if __name__ == "__main__":
     mp.set_start_method('spawn')
-    collect_data(1)
+    collect_data(100)
 
     # test_no_inputs()

@@ -13,7 +13,6 @@ import config
 logging.basicConfig(filename='logs/train.log', level=logging.DEBUG, format='%(asctime)s %(levelname)-8s %(message)s')
 logger = logging.getLogger(__name__)
 
-
 user32 = ctypes.WinDLL('user32', use_last_error=True)
 
 INPUT_MOUSE = 0
@@ -223,15 +222,18 @@ def reset_round():
 
 
 def test_inputs():
-    d = mapping_dicts[1]
-    time.sleep(5)
-    for _, k in d.items():
-        print(_)
-        time.sleep(2)
-        PressKey(k)  # s # down
-        time.sleep(.1)
-        ReleaseKey(k)  # r
-        print("----")
+    for r in range(0, 2):
+        d = mapping_dicts[r]
 
-if __name__=="__main__":
+        time.sleep(5)
+        for _, k in d.items():
+            print(_)
+            time.sleep(2)
+            PressKey(k)  # s # down
+            time.sleep(.1)
+            ReleaseKey(k)  # r
+            print("----")
+
+
+if __name__ == "__main__":
     test_inputs()
