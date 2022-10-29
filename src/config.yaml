@@ -1,4 +1,4 @@
-run_name: "smooth_reset"
+run_name: "p1_cpu_5"
 minmax_file: "data/test_minmax.json"
 valid_inputs:
   - "2"

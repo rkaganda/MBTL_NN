@@ -8,6 +8,29 @@ import datetime
 from pathlib import Path
 
 
+# class Model(nn.Module):
+#     def __init__(self, input_size, output_size):
+#         super(Model, self).__init__()
+#         # self.flatten = nn.Flatten()
+#         self.linear_relu_stack = nn.Sequential(
+#             nn.Linear(input_size, 512),
+#             nn.ReLU(),
+#             nn.Linear(512, 512),
+#             nn.ReLU(),
+#             nn.Linear(512, 512),
+#             nn.ReLU(),
+#             nn.Linear(512, 512),
+#             nn.ReLU(),
+#             nn.Linear(512, output_size),
+#         )
+#         self.activation = torch.nn.Sigmoid()
+#
+#     def forward(self, x):
+#         # x = self.flatten(x)
+#         out = self.linear_relu_stack(x)
+#         return self.activation(out)
+
+
 class Model(nn.Module):
     def __init__(self, input_size, output_size):
         super(Model, self).__init__()
@@ -15,12 +38,16 @@ class Model(nn.Module):
         self.linear_relu_stack = nn.Sequential(
             nn.Linear(input_size, 512),
             nn.ReLU(),
+            nn.Dropout(.20),
             nn.Linear(512, 512),
             nn.ReLU(),
+            nn.Dropout(.20),
             nn.Linear(512, 512),
             nn.ReLU(),
+            nn.Dropout(.20),
             nn.Linear(512, 512),
             nn.ReLU(),
+            nn.Dropout(.20),
             nn.Linear(512, output_size),
         )
         self.activation = torch.nn.Sigmoid()
@@ -29,6 +56,7 @@ class Model(nn.Module):
         # x = self.flatten(x)
         out = self.linear_relu_stack(x)
         return self.activation(out)
+
 
 
 def setup_model(frames_per_observation, input_state_size, state_state_size, learning_rate):
@@ -57,6 +85,7 @@ def save_model(model, optim, player_idx):
     Path(path).mkdir(parents=True, exist_ok=True)
 
     time_str = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+    print("saving model {}".format(time_str))
 
     torch.save(model.state_dict(), "{}/{}.model".format(path, time_str))
     torch.save(optim.state_dict(), "{}/{}.optim".format(path, time_str))

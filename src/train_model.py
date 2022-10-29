@@ -92,6 +92,8 @@ def create_dataset(data):
 
 
 def train(model, optim, criterion, data):
+    model.train()
+
     observation = Variable(data[0]).to(device)
     action_out = model(observation).to(device)
 
@@ -112,6 +114,7 @@ def train_model(reward_path, model, optim, epochs):
     reward_data = load_reward_data(reward_path)
 
     criterion = nn.CrossEntropyLoss(reduction='none')
+    criterion.to(device)
     model.to(device)
 
     print(model)

@@ -84,7 +84,7 @@ class EvalWorker(mp.Process):
         )
 
         if config.settings['model_file'] is not None:
-            model.load_model(self.model, self.optimizer)
+            model.load_model(self.model, self.optimizer, self.player_idx)
             print("loaded model")
         else:
             print("fresh model")
@@ -94,9 +94,10 @@ class EvalWorker(mp.Process):
         self.model.eval()
 
         # warm up model
-        in_tensor = torch.ones(
-            self.frames_per_evaluation * (len(self.input_state) + (len(self.state_format['attrib']) * 2))).to(device)
-        out_tensor = self.model(in_tensor)
+        with torch.no_grad():
+            in_tensor = torch.ones(
+                self.frames_per_evaluation * (len(self.input_state) + (len(self.state_format['attrib']) * 2))).to(device)
+            out_tensor = self.model(in_tensor)
 
     def round_cleanup(self, normalized_states, model_output):
         eval_util.store_eval_output(

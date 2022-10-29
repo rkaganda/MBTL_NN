@@ -242,6 +242,6 @@ def collect_data(capture_count):
 
 if __name__ == "__main__":
     mp.set_start_method('spawn')
-    collect_data(100)
+    collect_data(10)
 
     # test_no_inputs()

@@ -210,6 +210,7 @@ def reset_round():
             time.sleep(.001)
             ReleaseKey(k)
 
+    time.sleep(.001)
     PressKey(0x53)  # s # down
     time.sleep(.001)
     PressKey(0x52)  # r
