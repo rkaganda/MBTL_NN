@@ -57,21 +57,24 @@ device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 #                    map_location=lambda storage, loc: storage))
 #     optimizer.load_state_dict(torch.load("{}/{}/model/{}.optim".format(path, run_name, load_model_file)))
 
-def load_reward_data(reward_path):
-    onlyfiles = [f for f in listdir(reward_path) if isfile(join(reward_path, f))]
+def load_reward_data(reward_paths):
+    all_files = []
+    for r_path in reward_paths:
+        onlyfiles = [f for f in listdir(r_path) if isfile(join(r_path, f))]
+        for f in onlyfiles:
+            if f.startswith('reward_'):
+                all_files.append("{}/{}".format(r_path, f))
 
     full_data = {
         'input': [],
         'output': [],
         'reward': []
     }
-
-    for file in tqdm(onlyfiles):
-        if file.startswith('reward_'):
-            with open("{}/{}".format(reward_path, file)) as f:
-                file_dict = json.load(f)
-            for k_, i_ in file_dict.items():
-                full_data[k_] = full_data[k_] + i_
+    for file in tqdm(all_files):
+        with open(file) as f:
+            file_dict = json.load(f)
+        for k_, i_ in file_dict.items():
+            full_data[k_] = full_data[k_] + i_
     return full_data
 
 
@@ -93,7 +96,7 @@ def create_dataset(data):
     return td.TensorDataset(input_tensor, output_tensor, reward_tensor)
 
 
-def train(model, optim, criterion, data, batch_size):
+def train(model, optim, criterion, data):
     model.train()
     train_loss = 0
 
@@ -112,35 +115,36 @@ def train(model, optim, criterion, data, batch_size):
     loss.backward()
     optim.step()  # Updates the network weights based on the calculated gradients
 
-    train_loss += loss.item() * batch_size
+    train_loss += loss.item()
 
     return train_loss
 
 
-def train_model(reward_path, model, optim, epochs, episode_num):
-    reward_data = load_reward_data(reward_path)
+def train_model(reward_paths, stats_path, model, optim, epochs, episode_num):
+    reward_data = load_reward_data(reward_paths)
     batch_size = 64
 
     criterion = nn.CrossEntropyLoss(reduction='none')
     criterion.to(device)
     model.to(device)
 
-    print(model)
-    print(optim)
-
     dataset = create_dataset(reward_data)
 
     train_loader = torch.utils.data.DataLoader(dataset, batch_size=batch_size, shuffle=True)
 
-    total_loss = 0
+    stats = {}
     step_count = 0
 
     for epoch in tqdm(range(0, epochs)):
         for step, batch_data in enumerate(train_loader):
-            train_loss = train(model, optim, criterion, batch_data, batch_size)
-            total_loss += train_loss
-            step_count = step
-        total_loss = total_loss / (batch_size*step_count)
+            train_loss = train(model, optim, criterion, batch_data)
+            stats[step] = {
+                "batch_size": len(batch_data[0]),
+                "loss": train_loss
+            }
+
+    with open("{}/{}.json".format(stats_path, episode_num), 'a') as f_writer:
+        f_writer.write(json.dumps(stats))
 
 
 # def main():

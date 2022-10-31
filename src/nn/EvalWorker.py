@@ -120,13 +120,17 @@ class EvalWorker(mp.Process):
     def reward_train(self):
         reward_path = "data/eval/{}/reward/{}/{}".format(config.settings['run_name'], self.player_idx, self.episode_number)
         eval_path = "data/eval/{}/evals/{}/{}".format(config.settings['run_name'], self.player_idx, self.episode_number)
+        stats_path = "data/eval/{}/stats".format(config.settings['run_name'], self.player_idx)
         calc_reward.generate_rewards(
             reward_path=reward_path,
             eval_path=eval_path,
             reward_columns=config.settings['reward_columns'][self.player_idx],
             falloff=config.settings['reward_falloff']
         )
-        train_model.train_model(reward_path, self.model, self.optimizer, config.settings['epochs'], self.episode_number)
+        reward_paths = []
+        for ep in range(0, self.episode_number+1):
+            reward_paths.append("data/eval/{}/reward/{}/{}".format(config.settings['run_name'], self.player_idx, ep))
+        train_model.train_model(reward_paths, stats_path, self.model, self.optimizer, config.settings['epochs'], self.episode_number)
 
     def run(self):
         try:
