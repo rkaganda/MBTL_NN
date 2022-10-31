@@ -2,6 +2,8 @@ import time
 import logging
 import traceback
 import datetime
+import math
+import random
 
 import multiprocessing as mp
 import numpy as np
@@ -142,6 +144,11 @@ class EvalWorker(mp.Process):
             last_normalized_index = 0
             last_evaluated_index = 0
 
+            # RNG
+            final_epsilon = 0.05
+            initial_epsilon = 1
+            epsilon_decay = 5000
+
             self.eval_status['eval_ready'] = True
             while not self.eval_status['kill_eval']:
                 self.eval_status['eval_ready'] = True
@@ -158,23 +165,29 @@ class EvalWorker(mp.Process):
                         if ((last_normalized_index - self.reaction_delay) >= last_evaluated_index) and (
                                 (len(normalized_states) - self.reaction_delay) >= self.frames_per_evaluation):
 
-                            # create slice for evaluation
-                            evaluation_frames = normalized_states[:-self.reaction_delay]
-                            evaluation_frames = evaluation_frames[-self.frames_per_evaluation:]
+                            eps_threshold = final_epsilon + (initial_epsilon - final_epsilon) * \
+                                            math.exp(-1. * self.run_count / epsilon_decay)
 
-                            # flatten for input into model
-                            flat_frames = []
-                            for f_ in evaluation_frames:
-                                flat_frames = flat_frames + f_['input'] + f_['game']
+                            if random.random() < eps_threshold:
+                                detached_out = torch.Tensor(np.random.rand(len(self.input_state)))
+                            else:
+                                # create slice for evaluation
+                                evaluation_frames = normalized_states[:-self.reaction_delay]
+                                evaluation_frames = evaluation_frames[-self.frames_per_evaluation:]
 
-                            # create tensor
-                            in_tensor = torch.Tensor(flat_frames).to(device)
+                                # flatten for input into model
+                                flat_frames = []
+                                for f_ in evaluation_frames:
+                                    flat_frames = flat_frames + f_['input'] + f_['game']
 
-                            # input data into model
-                            with torch.no_grad():
-                                out_tensor = self.model(in_tensor)
+                                # create tensor
+                                in_tensor = torch.Tensor(flat_frames).to(device)
 
-                            detached_out = out_tensor.detach().cpu()
+                                # input data into model
+                                with torch.no_grad():
+                                    out_tensor = self.model(in_tensor)
+
+                                detached_out = out_tensor.detach().cpu()
                             try:
                                 prob = torch.bernoulli(detached_out).numpy()
                             except RuntimeError as e:

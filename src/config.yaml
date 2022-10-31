@@ -1,4 +1,4 @@
-run_name: "full_reward_modified_fall"
+run_name: "esp_test"
 minmax_file: "data/new_minmax.json"
 valid_inputs:
   - "2"
@@ -16,7 +16,7 @@ learning_rate: 1e-5
 
 model_file:
 
-count_save: 2
+count_save: 10
 epochs: 1
 
 timer_max: 9999999
