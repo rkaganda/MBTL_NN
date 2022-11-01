@@ -6,6 +6,7 @@ from torch.autograd import Variable
 import config
 import datetime
 from pathlib import Path
+import numpy as np
 
 
 # class Model(nn.Module):
@@ -88,6 +89,18 @@ def save_model(model, optim, player_idx, episode_num):
 
     torch.save(model.state_dict(), "{}/{}.model".format(path, time_str))
     torch.save(optim.state_dict(), "{}/{}.optim".format(path, time_str))
+
+
+# takes in a module and applies the specified weight initialization
+def weights_init_uniform_rule(m):
+    classname = m.__class__.__name__
+    # for every Linear layer in a model..
+    if classname.find('Linear') != -1:
+        # get the number of the inputs
+        n = m.in_features
+        y = 1.0/np.sqrt(n)
+        m.weight.data.uniform_(-y, y)
+        m.bias.data.fill_(0)
 
 
 

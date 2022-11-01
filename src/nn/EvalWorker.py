@@ -93,6 +93,10 @@ class EvalWorker(mp.Process):
             print("loaded model")
         else:
             print("fresh model")
+            torch.manual_seed(0)
+
+            model.weights_init_uniform_rule(model)
+
             model.save_model(self.model, self.optimizer, self.player_idx, episode_num=-1)
 
         self.model.to(device)
