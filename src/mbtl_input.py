@@ -245,17 +245,17 @@ def do_inputs(input_index, input_list, die, env_status):
 
     while not die.is_set():
         if not env_status['round_done']:
-            time.sleep(.013)
+            time.sleep(1)
             inputs_hold.clear()
             for k in input_list[input_index.value]:
                 if k not in inputs_held:
                     PressKey(k)
-                    inputs_hold.add(k)
+                inputs_hold.add(k)
             release_inputs = (inputs_held - inputs_hold)
             if len(release_inputs) > 0:
                 for k in release_inputs:
                     ReleaseKey(k)
-                release_inputs.clear()
+            release_inputs.clear()
             inputs_held = copy.deepcopy(inputs_hold)
         else:
             time.sleep(.001)
