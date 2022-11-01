@@ -83,7 +83,7 @@ class EvalWorker(mp.Process):
     def setup_model(self):
         self.model, self.optimizer = model.setup_model(
             frames_per_observation=self.frames_per_evaluation,
-            input_state_size=self.input_index_max+1,
+            input_state_size=self.input_index_max + 1,
             state_state_size=len(self.state_format['attrib']),
             learning_rate=self.learning_rate
         )
@@ -125,7 +125,8 @@ class EvalWorker(mp.Process):
             self.episode_number += 1
 
     def reward_train(self):
-        reward_path = "data/eval/{}/reward/{}/{}".format(config.settings['run_name'], self.player_idx, self.episode_number)
+        reward_path = "data/eval/{}/reward/{}/{}".format(config.settings['run_name'], self.player_idx,
+                                                         self.episode_number)
         eval_path = "data/eval/{}/evals/{}/{}".format(config.settings['run_name'], self.player_idx, self.episode_number)
         stats_path = "data/eval/{}/stats".format(config.settings['run_name'], self.player_idx)
         calc_reward.generate_rewards(
@@ -135,9 +136,10 @@ class EvalWorker(mp.Process):
             falloff=config.settings['reward_falloff']
         )
         reward_paths = []
-        for ep in range(0, self.episode_number+1):
+        for ep in range(0, self.episode_number + 1):
             reward_paths.append("data/eval/{}/reward/{}/{}".format(config.settings['run_name'], self.player_idx, ep))
-        train_model.train_model(reward_paths, stats_path, self.model, self.optimizer, config.settings['epochs'], self.episode_number)
+        train_model.train_model(reward_paths, stats_path, self.model, self.optimizer, config.settings['epochs'],
+                                self.episode_number)
 
     def run(self):
         try:
@@ -170,11 +172,14 @@ class EvalWorker(mp.Process):
                         if ((last_normalized_index - self.reaction_delay) >= last_evaluated_index) and (
                                 (len(normalized_states) - self.reaction_delay) >= self.frames_per_evaluation):
 
+                            # exploration calculation
+                            esp_count = self.run_count % config.settings['count_save']
+
                             eps_threshold = final_epsilon + (initial_epsilon - final_epsilon) * \
-                                            math.exp(-1. * self.run_count / epsilon_decay)
+                                            math.exp(-1. * esp_count / epsilon_decay)
 
                             if random.random() < eps_threshold:
-                                detached_out = torch.Tensor(np.random.rand(self.input_index_max+1))
+                                detached_out = torch.Tensor(np.random.rand(self.input_index_max + 1))
                             else:
                                 # create slice for evaluation
                                 evaluation_frames = normalized_states[:-self.reaction_delay]
