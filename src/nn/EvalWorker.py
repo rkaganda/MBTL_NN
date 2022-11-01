@@ -169,7 +169,7 @@ class EvalWorker(mp.Process):
                             eps_threshold = final_epsilon + (initial_epsilon - final_epsilon) * \
                                             math.exp(-1. * self.run_count / epsilon_decay)
 
-                            if False: # random.random() < eps_threshold:
+                            if random.random() < eps_threshold:
                                 detached_out = torch.Tensor(np.random.rand(self.input_index_max+1))
                             else:
                                 # create slice for evaluation
@@ -191,7 +191,6 @@ class EvalWorker(mp.Process):
                                 detached_out = out_tensor.detach().cpu()
                             try:
                                 action_index = torch.argmax(detached_out).numpy()
-                                action_index = 75
                                 # print("action_index={}".format(action_index))
                             except RuntimeError as e:
                                 print("in_tensor={}".format(in_tensor))
