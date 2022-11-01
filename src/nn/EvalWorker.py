@@ -27,7 +27,8 @@ torch.set_default_dtype(torch.float64)
 
 
 class EvalWorker(mp.Process):
-    def __init__(self, game_states, frames_per_evaluation, reaction_delay, env_status, eval_status, input_state, state_format,
+    def __init__(self, game_states, frames_per_evaluation, reaction_delay, env_status, eval_status,
+                 input_index, input_index_max, state_format,
                  learning_rate, player_idx, frame_list):
         super(EvalWorker, self).__init__()
         self.states = game_states
@@ -35,7 +36,8 @@ class EvalWorker(mp.Process):
         self.reaction_delay = reaction_delay
         self.env_status = env_status
         self.eval_status = eval_status
-        self.input_state = input_state
+        self.input_index = input_index
+        self.input_index_max = input_index_max
         self.learning_rate = learning_rate
         self.player_idx = player_idx
         self.frame_list = frame_list
@@ -71,18 +73,17 @@ class EvalWorker(mp.Process):
                 norm_state['game'].append((game_state[p_idx][attrib] - minmax[attrib]['min']) / (
                     min_max_diff) if min_max_diff != 0 else 0)
 
-        # normalize inputs
-        input_state = state['input'][self.player_idx]
-        norm_state['input'] = list()
-        for i_ in self.state_format['input']:  # for each input
-            norm_state['input'].append(input_state[i_])
+        # normalize input
+        input_index = state['input'][self.player_idx]
+        # print("input_index = {}".format(input_index))
+        norm_state['input'] = input_index / self.input_index_max
 
         return norm_state
 
     def setup_model(self):
         self.model, self.optimizer = model.setup_model(
             frames_per_observation=self.frames_per_evaluation,
-            input_state_size=len(self.input_state),
+            input_state_size=self.input_index_max+1,
             state_state_size=len(self.state_format['attrib']),
             learning_rate=self.learning_rate
         )
@@ -100,7 +101,7 @@ class EvalWorker(mp.Process):
         # warm up model
         with torch.no_grad():
             in_tensor = torch.ones(
-                self.frames_per_evaluation * (len(self.input_state) + (len(self.state_format['attrib']) * 2))).to(device)
+                self.frames_per_evaluation * (1 + (len(self.state_format['attrib']) * 2))).to(device)
             out_tensor = self.model(in_tensor)
 
     def round_cleanup(self, normalized_states, model_output):
@@ -145,9 +146,9 @@ class EvalWorker(mp.Process):
             last_evaluated_index = 0
 
             # RNG
-            final_epsilon = 0.05
-            initial_epsilon = 1
-            epsilon_decay = 5000
+            final_epsilon = config.settings['final_epsilon']
+            initial_epsilon = config.settings['initial_epsilon']
+            epsilon_decay = config.settings['epsilon_decay']
 
             self.eval_status['eval_ready'] = True
             while not self.eval_status['kill_eval']:
@@ -169,7 +170,7 @@ class EvalWorker(mp.Process):
                                             math.exp(-1. * self.run_count / epsilon_decay)
 
                             if random.random() < eps_threshold:
-                                detached_out = torch.Tensor(np.random.rand(len(self.input_state)))
+                                detached_out = torch.Tensor(np.random.rand(self.input_index_max+1))
                             else:
                                 # create slice for evaluation
                                 evaluation_frames = normalized_states[:-self.reaction_delay]
@@ -178,7 +179,7 @@ class EvalWorker(mp.Process):
                                 # flatten for input into model
                                 flat_frames = []
                                 for f_ in evaluation_frames:
-                                    flat_frames = flat_frames + f_['input'] + f_['game']
+                                    flat_frames = flat_frames + [f_['input']] + f_['game']
 
                                 # create tensor
                                 in_tensor = torch.Tensor(flat_frames).to(device)
@@ -189,14 +190,15 @@ class EvalWorker(mp.Process):
 
                                 detached_out = out_tensor.detach().cpu()
                             try:
-                                prob = torch.bernoulli(detached_out).numpy()
+                                action_index = torch.argmax(detached_out).numpy()
+                                # print("action_index={}".format(action_index))
+                                logger.debug("action_index={}".format(action_index))
                             except RuntimeError as e:
                                 print("in_tensor={}".format(in_tensor))
-                                print("detached_out={}".format(detached_out))
+                                print("detached_out={}".format(action_index))
                                 raise e
 
-                            for idx, key in enumerate(self.state_format['input']):
-                                self.input_state[key] = 1 if prob[idx] == 1 else 0
+                            self.input_index.value = action_index
 
                             # store model output
                             model_output[last_evaluated_index] = {

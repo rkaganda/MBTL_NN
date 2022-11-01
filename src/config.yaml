@@ -1,22 +1,35 @@
-run_name: "esp_test"
+run_name: "action_test"
 minmax_file: "data/new_minmax.json"
-valid_inputs:
+
+directions:
+  - "1"
   - "2"
+  - "3"
   - "4"
-  - "8"
+  - "5"
   - "6"
+  - "7"
+  - "8"
+  - "9"
+
+buttons:
   - "a"
   - "b"
   - "c"
   - "d"
+
 frames_per_observation: 10
 reaction_delay: 1
 learning_rate: 1e-5
 
+final_epsilon:  .01
+initial_epsilon: 1
+epsilon_decay: 3
+
 
 model_file:
 
-count_save: 10
+count_save: 20
 epochs: 1
 
 timer_max: 9999999

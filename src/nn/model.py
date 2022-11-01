@@ -59,7 +59,7 @@ class Model(nn.Module):
 
 
 def setup_model(frames_per_observation, input_state_size, state_state_size, learning_rate):
-    input_layer_size = frames_per_observation*(input_state_size+(state_state_size*2))
+    input_layer_size = frames_per_observation*(1+(state_state_size*2))
     model = Model(input_layer_size, input_state_size)
     model.share_memory()
 

@@ -124,15 +124,25 @@ def ReleaseKey(hexKeyCode):
 mapping_dicts = dict()
 
 mapping_dicts[0] = dict()
-mapping_dicts[0]['2'] = 0x53  # P1 2 # s
-mapping_dicts[0]['4'] = 0x41  # P1 4 # a
-mapping_dicts[0]['8'] = 0x44  # P1 8 # d
-mapping_dicts[0]['6'] = 0x57  # P1 6 # w
+mapping_dicts[0]['directions'] = dict()
+mapping_dicts[0]['directions']['1'] = [0x53, 0x41]  # P1 1 = 4+2
+mapping_dicts[0]['directions']['2'] = [0x53]  # P1 2 # s
+mapping_dicts[0]['directions']['3'] = [0x53, 0x57]  # P1 3 = 2+6
+mapping_dicts[0]['directions']['4'] = [0x41]  # P1 4 # a
+mapping_dicts[0]['directions']['5'] = []  # P1 5
+mapping_dicts[0]['directions']['6'] = [0x57]  # P1 6 # w
+mapping_dicts[0]['directions']['7'] = [0x57, 0x44]  # P1 7 = 4 + 8
+mapping_dicts[0]['directions']['8'] = [0x44]  # P1 8 # d
+mapping_dicts[0]['directions']['9'] = [0x44, 0x57]  # P1 8 # d
+
 # buttons
-mapping_dicts[0]['a'] = 0x49  # P1 A # i
-mapping_dicts[0]['b'] = 0x55  # P1 B # u
-mapping_dicts[0]['c'] = 0x4F  # P1 C # o
-mapping_dicts[0]['d'] = 0x4A  # P1 D # j
+mapping_dicts[0]['buttons'] = dict()
+mapping_dicts[0]['buttons']['a'] = [0x49]  # P1 A # i
+mapping_dicts[0]['buttons']['b'] = [0x55]  # P1 B # u
+mapping_dicts[0]['buttons']['c'] = [0x4F]  # P1 C # o
+mapping_dicts[0]['buttons']['d'] = [0x4A]  # P1 D # j
+
+all_keys = [0x53, 0x41, 0x57, 0x44, 0x49, 0x55, 0x4F, 0x4A]
 
 # P2
 mapping_dicts[1] = dict()
@@ -147,43 +157,110 @@ mapping_dicts[1]['b'] = 0x4E  # P2 B # n
 mapping_dicts[1]['c'] = 0x4D  # P2 C # m
 mapping_dicts[1]['d'] = 0xBC  # P2 D # ,
 
-input_pressed = dict()
-for k_ in config.settings['valid_inputs']:
-    input_pressed[k_] = False
+
+def create_input_list(player_index):
+    directions = []
+    for idx, direction in enumerate(config.settings['directions']):
+        directions.append(mapping_dicts[player_index]['directions'][direction])
+
+    directions_lists = []
+    for r in range(0, len(directions)):
+        ar = [0] * 9
+        ar[r] = 1
+        directions_lists.append(ar)
+
+    print(directions_lists)
+
+    for d_list in directions_lists:
+        for idx, value in enumerate(directions):
+            if d_list[idx] == 1:
+                d_list[idx] = value
+            else:
+                d_list[idx] = []
+
+    buttons_list = []
+    for idx, button in enumerate(config.settings['buttons']):
+        buttons_list.append(mapping_dicts[player_index]['buttons'][button])
+
+    combinations = []
+
+    for r in range(0, len(buttons_list)):
+        if len(combinations) == 0:
+            combinations.append([0])
+            combinations.append([1])
+        else:
+            new_comb = []
+            for idx, c in enumerate(combinations):
+                new_a = copy.deepcopy(c)
+                new_b = copy.deepcopy(c)
+                new_a.append(0)
+                new_b.append(1)
+                new_comb.append(new_a)
+                new_comb.append(new_b)
+                combinations = copy.deepcopy(new_comb)
+
+    for c_list in combinations:
+        for idx, value in enumerate(buttons_list):
+            if c_list[idx] == 1:
+                c_list[idx] = value
+            else:
+                c_list[idx] = []
+
+    all_combinations = []
+
+    for d in directions_lists:
+        for c in combinations:
+            all_combinations.append(d + c)
+
+    combined = []
+    neutral_index = None
+    for idx, ar in enumerate(all_combinations):
+        new_ar = []
+        for val_ar in ar:
+            new_ar = new_ar + val_ar
+        combined.append(new_ar)
+        if len(new_ar) == 0:
+            neutral_index = idx
+
+    return combined, neutral_index
 
 
-def create_input_dict(input_dict):
-    for k in config.settings['valid_inputs']:
-        input_dict[k] = 0
-
-    return input_dict
+# input_pressed = dict()
+# for k_ in config.settings['valid_inputs']:
+#     input_pressed[k_] = False
 
 
-def create_p2_input_dict():
-    input_dict = Manager().dict()
+# def create_p2_input_dict():
+#     input_dict = Manager().dict()
+#
+#     for k in config.settings['valid_inputs']:
+#         input_dict[k] = 0
+#
+#     return input_dict
 
-    for k in config.settings['valid_inputs']:
-        input_dict[k] = 0
 
-    return input_dict
+def do_inputs(input_index, input_list, die, env_status):
+    inputs_held = set()
+    inputs_hold = set()
 
-
-def do_inputs(input_dict, mapping_dict, die, env_status):
     while not die.is_set():
         if not env_status['round_done']:
-            time.sleep(.012)
-            for k in input_dict.keys():
-                if input_dict[k]:
-                    PressKey(mapping_dict[k])
-                    input_pressed[k] = True
-                elif input_pressed[k]:
-                    ReleaseKey(mapping_dict[k])
-                    input_pressed[k] = False
+            time.sleep(.013)
+            inputs_hold.clear()
+            for k in input_list[input_index.value]:
+                if k not in inputs_held:
+                    PressKey(k)
+                    inputs_hold.add(k)
+            release_inputs = (inputs_held - inputs_hold)
+            if len(release_inputs) > 0:
+                for k in release_inputs:
+                    ReleaseKey(k)
+                release_inputs.clear()
+            inputs_held = copy.deepcopy(inputs_hold)
         else:
             time.sleep(.001)
     print("do_inputs die..")
-    for k in input_pressed:
-        ReleaseKey(mapping_dict[k])
+    # aiu
     print("do_inputs dead..")
 
 
@@ -205,10 +282,9 @@ def randomize_inputs(input_dict):
 def reset_round():
     time.sleep(.001)
     # make sure every key is released
-    for _, mapping_dict in mapping_dicts.items():
-        for k in mapping_dict.values():
-            time.sleep(.001)
-            ReleaseKey(k)
+    for k in all_keys:
+        time.sleep(.001)
+        ReleaseKey(k)
 
     time.sleep(.001)
     PressKey(0x53)  # s # down
@@ -221,20 +297,3 @@ def reset_round():
     ReleaseKey(0x53)  # s # down
     # time.sleep(.001)
 
-
-def test_inputs():
-    for r in range(0, 2):
-        d = mapping_dicts[r]
-
-        time.sleep(5)
-        for _, k in d.items():
-            print(_)
-            time.sleep(2)
-            PressKey(k)  # s # down
-            time.sleep(.1)
-            ReleaseKey(k)  # r
-            print("----")
-
-
-if __name__ == "__main__":
-    test_inputs()

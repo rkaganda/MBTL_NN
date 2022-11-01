@@ -46,7 +46,7 @@ def create_norm_state_df(file_dict):
 
     for index, item in enumerate(file_dict['normalized_states']):
         row = dict()
-        for idx, value in enumerate(item['input'] + item['game']):
+        for idx, value in enumerate([item['input']] + item['game']):
             row[idx] = value
         norm_dict[index] = row
 
@@ -68,8 +68,8 @@ def calcuate_actual_state_df(file_dict):
         for player_id, player_states in item['game'].items():
             for attrib, value in player_states.items():
                 row["p_{}_{}".format(player_id, attrib)] = value
-        for p_input, value in item['input'].items():
-            row["input_{}".format(p_input)] = value
+
+        row["input"] = item['input']
         actual_state_dict[index] = row
 
     actual_state_df = pd.DataFrame.from_dict(actual_state_dict, orient='index')
