@@ -1,4 +1,4 @@
-run_name: "action_test"
+run_name: "dqn_test"
 minmax_file: "data/new_minmax.json"
 
 directions:
@@ -18,13 +18,15 @@ buttons:
   - "c"
   - "d"
 
-frames_per_observation: 10
+frames_per_observation: 1
 reaction_delay: 1
 learning_rate: 1e-5
 
 final_epsilon:  .01
 initial_epsilon: 1
-epsilon_decay: 3
+epsilon_decay: 2
+tau: 50
+batch_size: 16
 
 
 model_file:

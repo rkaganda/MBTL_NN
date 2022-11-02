@@ -17,7 +17,7 @@ import nn.model as model
 import nn.eval_util as eval_util
 import config
 import calc_reward
-import train_model
+import train_dqn_model
 
 logging.basicConfig(filename='./logs/train.log', level=logging.DEBUG, format='%(asctime)s %(levelname)-8s %(message)s')
 logger = logging.getLogger(__name__)
@@ -46,6 +46,9 @@ class EvalWorker(mp.Process):
 
         self.model = None
         self.optimizer = None
+
+        self.target = None
+
         self.episode_number = 0
 
         self.run_count = 1
@@ -88,6 +91,13 @@ class EvalWorker(mp.Process):
             learning_rate=self.learning_rate
         )
 
+        self.target, _ = model.setup_model(
+            frames_per_observation=self.frames_per_evaluation,
+            input_state_size=self.input_index_max + 1,
+            state_state_size=len(self.state_format['attrib']),
+            learning_rate=self.learning_rate
+        )
+
         if config.settings['model_file'] is not None:
             model.load_model(self.model, self.optimizer, self.player_idx)
             print("loaded model")
@@ -99,8 +109,11 @@ class EvalWorker(mp.Process):
 
             model.save_model(self.model, self.optimizer, self.player_idx, episode_num=-1)
 
+        self.target.load_state_dict(self.model.state_dict())
         self.model.to(device)
-        self.model.eval()
+        self.target.to(device)
+
+        self.target.eval()
 
         # warm up model
         with torch.no_grad():
@@ -117,6 +130,9 @@ class EvalWorker(mp.Process):
             self.player_idx,
             self.episode_number,
         )
+        if self.run_count % config.settings['tau'] == 0:
+            print("loading target from model")
+            self.target.load_state_dict(self.model.state_dict())
 
         if config.settings['save_model'] and (self.run_count % config.settings['count_save']) == 0:
             print("epoch cleanup...")
@@ -135,11 +151,14 @@ class EvalWorker(mp.Process):
             reward_columns=config.settings['reward_columns'][self.player_idx],
             falloff=config.settings['reward_falloff']
         )
-        reward_paths = []
-        for ep in range(0, self.episode_number + 1):
-            reward_paths.append("data/eval/{}/reward/{}/{}".format(config.settings['run_name'], self.player_idx, ep))
-        train_model.train_model(reward_paths, stats_path, self.model, self.optimizer, config.settings['epochs'],
-                                self.episode_number)
+
+        reward_paths = list()
+        for eps in range(0, self.episode_number+1):
+            reward_paths.append(
+                "data/eval/{}/reward/{}/{}".format(config.settings['run_name'], self.player_idx, eps))
+        train_dqn_model.train_model(reward_paths, stats_path, self.model, self.target, self.optimizer,
+                                    config.settings['epochs'],
+                                    self.episode_number)
 
     def run(self):
         try:
