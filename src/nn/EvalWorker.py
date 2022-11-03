@@ -121,11 +121,12 @@ class EvalWorker(mp.Process):
                 self.frames_per_evaluation * (1 + (len(self.state_format['attrib']) * 2))).to(device)
             out_tensor = self.model(in_tensor)
 
-    def round_cleanup(self, normalized_states, model_output):
+    def round_cleanup(self, normalized_states, model_output, model_input):
         eval_util.store_eval_output(
             normalized_states,
             self.states,
             model_output,
+            model_input,
             self.state_format,
             self.player_idx,
             self.episode_number,
@@ -166,6 +167,7 @@ class EvalWorker(mp.Process):
             did_store = False
 
             normalized_states = list()
+            model_input = list()
             model_output = dict()
             last_normalized_index = 0
             last_evaluated_index = 0
@@ -209,6 +211,8 @@ class EvalWorker(mp.Process):
                                 for f_ in evaluation_frames:
                                     flat_frames = flat_frames + [f_['input']] + f_['game']
 
+                                model_input.append(flat_frames)
+
                                 # create tensor
                                 in_tensor = torch.Tensor(flat_frames).to(device)
 
@@ -230,7 +234,7 @@ class EvalWorker(mp.Process):
                             # store model output
                             model_output[last_evaluated_index] = {
                                 'output': list(detached_out.numpy()),
-                                'frame': self.frame_list[-1],
+                                'frame': len(self.states) - 1,
                                 'norm_frame': last_normalized_index,
                                 'window': [
                                     last_normalized_index - self.reaction_delay - self.frames_per_evaluation,
@@ -247,9 +251,10 @@ class EvalWorker(mp.Process):
                     logger.debug("{} eval cleanup".format(self.player_idx))
                     self.eval_status['eval_ready'] = False
                     logger.debug("{} stopping eval".format(self.player_idx))
-                    self.round_cleanup(normalized_states, model_output)
+                    self.round_cleanup(normalized_states, model_output, model_input)
                     did_store = True
                     del normalized_states[:]
+                    del model_input[:]
                     model_output.clear()
                     last_normalized_index = 0
                     last_evaluated_index = 0

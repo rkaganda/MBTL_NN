@@ -51,12 +51,13 @@ class Model(nn.Module):
             nn.Dropout(.20),
             nn.Linear(512, output_size),
         )
-        self.activation = torch.nn.Sigmoid()
+        # self.activation = torch.nn.ReLU()
 
     def forward(self, x):
         # x = self.flatten(x)
         out = self.linear_relu_stack(x)
-        return self.activation(out)
+        return out
+        # return self.activation(out)
 
 
 def setup_model(frames_per_observation, input_state_size, state_state_size, learning_rate):
