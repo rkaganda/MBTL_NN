@@ -213,7 +213,7 @@ class EvalWorker(mp.Process):
                                 for f_ in evaluation_frames:
                                     flat_frames = flat_frames + [f_['input']] + f_['game']
 
-                                model_input.append(flat_frames)
+                                model_input = flat_frames
 
                                 # create tensor
                                 in_tensor = torch.Tensor(flat_frames).to(device)
