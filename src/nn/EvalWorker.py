@@ -52,6 +52,7 @@ class EvalWorker(mp.Process):
         self.episode_number = 0
 
         self.run_count = 1
+        self.epsilon = 1
 
     # normalize the state attributes between 0, 1 using precalculated min max
     def normalize_state(self, state):
@@ -194,10 +195,12 @@ class EvalWorker(mp.Process):
                                 (len(normalized_states) - self.reaction_delay) >= self.frames_per_evaluation):
 
                             # exploration calculation
-                            esp_count = self.run_count % config.settings['count_save']
+                            esp_count = self.run_count
 
                             eps_threshold = final_epsilon + (initial_epsilon - final_epsilon) * \
                                             math.exp(-1. * esp_count / epsilon_decay)
+
+                            self.epsilon = eps_threshold
 
                             if random.random() < eps_threshold:
                                 detached_out = torch.Tensor(np.random.rand(self.input_index_max + 1))
@@ -240,6 +243,7 @@ class EvalWorker(mp.Process):
                                     last_normalized_index - self.reaction_delay - self.frames_per_evaluation,
                                     last_normalized_index - self.reaction_delay - 1
                                 ],
+                                "epsilon": self.epsilon
                                 # 'input_tensor': flat_frames
                             }
 
@@ -248,6 +252,7 @@ class EvalWorker(mp.Process):
                     else:
                         pass  # no states yet
                 if not did_store and len(normalized_states) > 0:
+                    print("eps_threshold={}".format(self.epsilon))
                     logger.debug("{} eval cleanup".format(self.player_idx))
                     self.eval_status['eval_ready'] = False
                     logger.debug("{} stopping eval".format(self.player_idx))
