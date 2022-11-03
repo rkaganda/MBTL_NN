@@ -167,7 +167,6 @@ class EvalWorker(mp.Process):
             did_store = False
 
             normalized_states = list()
-            model_input = list()
             model_output = dict()
             last_normalized_index = 0
             last_evaluated_index = 0
@@ -213,8 +212,6 @@ class EvalWorker(mp.Process):
                                 for f_ in evaluation_frames:
                                     flat_frames = flat_frames + [f_['input']] + f_['game']
 
-                                model_input = flat_frames
-
                                 # create tensor
                                 in_tensor = torch.Tensor(flat_frames).to(device)
 
@@ -237,7 +234,7 @@ class EvalWorker(mp.Process):
                             model_output[last_evaluated_index] = {
                                 'output': list(detached_out.numpy()),
                                 'frame': self.frame_list[-1],
-                                'state': model_input,
+                                'state': flat_frames,
                                 'states': len(self.states) - 1,
                                 'norm_states': len(normalized_states),
                                 'last_evaluated_index': last_evaluated_index,
