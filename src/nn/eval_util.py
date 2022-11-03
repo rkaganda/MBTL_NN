@@ -7,7 +7,7 @@ import config
 import torch
 
 
-def store_eval_output(normalized_states, states, model_output, model_input, state_format, player_idx, episode_number):
+def store_eval_output(normalized_states, states, model_output, state_format, player_idx, episode_number):
     path = "data/eval/{}".format(config.settings['run_name'])
     datetime_str = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
 
@@ -19,7 +19,6 @@ def store_eval_output(normalized_states, states, model_output, model_input, stat
         "normalized_states": normalized_states,
         "states": copy.deepcopy(states),
         "model_output": copy.deepcopy(model_output),
-        "model_input": copy.deepcopy(model_input),
         "state_format": state_format
     }
     Path("{}/evals/{}/{}".format(path, player_idx, episode_number)).mkdir(parents=True, exist_ok=True)
