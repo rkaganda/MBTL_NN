@@ -239,7 +239,7 @@ class EvalWorker(mp.Process):
                                 'frame': self.frame_list[-1],
                                 'state': model_input,
                                 'states': len(self.states) - 1,
-                                'norm_states': len(self.normalize_state()),
+                                'norm_states': len(normalized_states),
                                 'last_evaluated_index': last_evaluated_index,
                                 'last_normalized_index': last_normalized_index,
                                 'window': [
