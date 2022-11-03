@@ -200,18 +200,18 @@ class EvalWorker(mp.Process):
 
                             self.epsilon = eps_threshold
 
+                            # create slice for evaluation
+                            evaluation_frames = normalized_states[:-self.reaction_delay]
+                            evaluation_frames = evaluation_frames[-self.frames_per_evaluation:]
+
+                            # flatten for input into model
+                            flat_frames = []
+                            for f_ in evaluation_frames:
+                                flat_frames = flat_frames + [f_['input']] + f_['game']
+
                             if random.random() < eps_threshold:
                                 detached_out = torch.Tensor(np.random.rand(self.input_index_max + 1))
                             else:
-                                # create slice for evaluation
-                                evaluation_frames = normalized_states[:-self.reaction_delay]
-                                evaluation_frames = evaluation_frames[-self.frames_per_evaluation:]
-
-                                # flatten for input into model
-                                flat_frames = []
-                                for f_ in evaluation_frames:
-                                    flat_frames = flat_frames + [f_['input']] + f_['game']
-
                                 # create tensor
                                 in_tensor = torch.Tensor(flat_frames).to(device)
 
