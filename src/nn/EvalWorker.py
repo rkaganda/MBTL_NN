@@ -80,7 +80,7 @@ class EvalWorker(mp.Process):
         # normalize input
         input_index = state['input'][self.player_idx]
         # print("input_index = {}".format(input_index))
-        norm_state['input'] = input_index / self.input_index_max
+        norm_state['input'] = input_index / (self.input_index_max+1)
 
         return norm_state
 
@@ -234,8 +234,8 @@ class EvalWorker(mp.Process):
                             model_output[last_evaluated_index] = {
                                 'output': list(detached_out.numpy()),
                                 'frame': self.frame_list[-1],
-                                'state': flat_frames,
-                                'states': len(self.states) - 1,
+                                # 'state': flat_frames,
+                                'states': len(self.states),
                                 'norm_states': len(normalized_states),
                                 'last_evaluated_index': last_evaluated_index,
                                 'last_normalized_index': last_normalized_index,

@@ -169,7 +169,7 @@ def create_input_list(player_index):
         ar[r] = 1
         directions_lists.append(ar)
 
-    print(directions_lists)
+    # directions_lists = [[0, 0, 0, 1, 0, 0, 0, 0, 0]]
 
     for d_list in directions_lists:
         for idx, value in enumerate(directions):
@@ -182,22 +182,31 @@ def create_input_list(player_index):
     for idx, button in enumerate(config.settings['buttons']):
         buttons_list.append(mapping_dicts[player_index]['buttons'][button])
 
-    combinations = []
-
-    for r in range(0, len(buttons_list)):
-        if len(combinations) == 0:
-            combinations.append([0])
-            combinations.append([1])
-        else:
-            new_comb = []
-            for idx, c in enumerate(combinations):
-                new_a = copy.deepcopy(c)
-                new_b = copy.deepcopy(c)
-                new_a.append(0)
-                new_b.append(1)
-                new_comb.append(new_a)
-                new_comb.append(new_b)
-                combinations = copy.deepcopy(new_comb)
+    # combinations = []
+    # for r in range(0, len(buttons_list)):
+    #     if len(combinations) == 0:
+    #         combinations.append([0])
+    #         combinations.append([1])
+    #     else:
+    #         new_comb = []
+    #         for idx, c in enumerate(combinations):
+    #             new_a = copy.deepcopy(c)
+    #             new_b = copy.deepcopy(c)
+    #             new_a.append(0)
+    #             new_b.append(1)
+    #             new_comb.append(new_a)
+    #             new_comb.append(new_b)
+    #             combinations = copy.deepcopy(new_comb)
+    combinations = [
+        [0, 0, 0, 0],  # neutral
+        [1, 0, 0, 0],  # a
+        [0, 1, 0, 0],  # b
+        [0, 0, 1, 0],  # c
+        [0, 0, 0, 1],  # d
+        [1, 1, 0, 0],  # ab
+        [0, 1, 1, 0],  # ab
+        [1, 0, 0, 1]  # ac
+    ]
 
     for c_list in combinations:
         for idx, value in enumerate(buttons_list):
@@ -221,6 +230,11 @@ def create_input_list(player_index):
         combined.append(new_ar)
         if len(new_ar) == 0:
             neutral_index = idx
+
+    print(neutral_index)
+    print(combined)
+    if neutral_index is None:
+        neutral_index = 0
 
     return combined, neutral_index
 
@@ -296,4 +310,3 @@ def reset_round():
     time.sleep(.001)
     ReleaseKey(0x53)  # s # down
     # time.sleep(.001)
-

@@ -1,4 +1,4 @@
-run_name: "dqn_test"
+run_name: "input_tests"
 minmax_file: "data/new_minmax.json"
 
 directions:
@@ -48,4 +48,4 @@ reward_columns:
     "p_0_health": -1
     "p_1_health": 1.5
 
-reward_falloff: 8
+reward_falloff: 30
