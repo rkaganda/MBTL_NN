@@ -1,5 +1,5 @@
-run_name: "input_tests"
-minmax_file: "data/new_minmax.json"
+run_name: "2p_test"
+minmax_file: "data/expanded_minmax.json"
 
 directions:
   - "1"
@@ -26,12 +26,9 @@ final_epsilon:  .01
 initial_epsilon: 1
 epsilon_decay: 2
 tau: 50
-batch_size: 16
+batch_size: 128
 
-
-model_file:
-
-count_save: 20
+count_save: 1
 epochs: 1
 
 timer_max: 9999999
@@ -46,6 +43,6 @@ reward_columns:
     "p_1_health": -1
   1:
     "p_0_health": -1
-    "p_1_health": 1.5
+    "p_1_health": 1
 
 reward_falloff: 30

@@ -80,7 +80,7 @@ class EvalWorker(mp.Process):
         # normalize input
         input_index = state['input'][self.player_idx]
         # print("input_index = {}".format(input_index))
-        norm_state['input'] = input_index / (self.input_index_max+1)
+        norm_state['input'] = input_index / (self.input_index_max + 1)
 
         return norm_state
 
@@ -98,9 +98,12 @@ class EvalWorker(mp.Process):
             state_state_size=len(self.state_format['attrib']),
             learning_rate=self.learning_rate
         )
+        self.episode_number, self.run_count = eval_util.get_next_episode(player_idx=self.player_idx)
 
-        if config.settings['model_file'] is not None:
-            model.load_model(self.model, self.optimizer, self.player_idx)
+        if self.episode_number > 0:
+            print("resuming player:{} on eps:{} run_count:{}".format(self.player_idx, self.episode_number,
+                                                                     self.run_count))
+            model.load_model(self.model, self.optimizer, self.player_idx, self.episode_number, device)
             print("loaded model")
         else:
             print("fresh model")
@@ -111,8 +114,8 @@ class EvalWorker(mp.Process):
             model.save_model(self.model, self.optimizer, self.player_idx, episode_num=-1)
 
         self.target.load_state_dict(self.model.state_dict())
-        self.model.to(device)
-        self.target.to(device)
+        self.model = self.model.to(device)
+        self.target = self.target.to(device)
 
         self.target.eval()
 
@@ -154,7 +157,7 @@ class EvalWorker(mp.Process):
         )
 
         reward_paths = list()
-        for eps in range(0, self.episode_number+1):
+        for eps in range(0, self.episode_number + 1):
             reward_paths.append(
                 "data/eval/{}/reward/{}/{}".format(config.settings['run_name'], self.player_idx, eps))
         train_dqn_model.train_model(reward_paths, stats_path, self.model, self.target, self.optimizer,

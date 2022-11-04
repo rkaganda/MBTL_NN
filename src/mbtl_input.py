@@ -146,16 +146,25 @@ all_keys = [0x53, 0x41, 0x57, 0x44, 0x49, 0x55, 0x4F, 0x4A]
 
 # P2
 mapping_dicts[1] = dict()
+
 # directions
-mapping_dicts[1]['2'] = 0x58  # P2 2 # x #
-mapping_dicts[1]['4'] = 0x56  # P2 4 # c
-mapping_dicts[1]['8'] = 0x5A  # P2 8 # v
-mapping_dicts[1]['6'] = 0x43  # P2 6 # z
+mapping_dicts[1]['directions'] = dict()
+mapping_dicts[1]['directions']['1'] = [0x58, 0x56]  # P2 2 4
+mapping_dicts[1]['directions']['2'] = [0x58]  # P2 2 # x #
+mapping_dicts[1]['directions']['3'] = [0x58, 0x43]  # P2 2 6
+mapping_dicts[1]['directions']['4'] = [0x56]  # P2 4 # c
+mapping_dicts[1]['directions']['5'] = []  # P2 4 # c
+mapping_dicts[1]['directions']['6'] = [0x43]  # P2 6 # z
+mapping_dicts[1]['directions']['7'] = [0x56, 0x5A]  # P2 4 8
+mapping_dicts[1]['directions']['8'] = [0x5A]  # P2 8 # v
+mapping_dicts[1]['directions']['9'] = [0x43, 0x5A]  # P2 6 8
+
 # buttons
-mapping_dicts[1]['a'] = 0x42  # P2 A # b
-mapping_dicts[1]['b'] = 0x4E  # P2 B # n
-mapping_dicts[1]['c'] = 0x4D  # P2 C # m
-mapping_dicts[1]['d'] = 0xBC  # P2 D # ,
+mapping_dicts[1]['buttons'] = dict()
+mapping_dicts[1]['buttons']['a'] = [0x42]  # P2 A # b
+mapping_dicts[1]['buttons']['b'] = [0x4E]  # P2 B # n
+mapping_dicts[1]['buttons']['c'] = [0x4D]  # P2 C # m
+mapping_dicts[1]['buttons']['d'] = [0xBC]  # P2 D # ,
 
 
 def create_input_list(player_index):
@@ -231,8 +240,8 @@ def create_input_list(player_index):
         if len(new_ar) == 0:
             neutral_index = idx
 
-    print(neutral_index)
-    print(combined)
+    # print(neutral_index)
+    # print(combined)
     if neutral_index is None:
         neutral_index = 0
 

@@ -7,6 +7,8 @@ import config
 import datetime
 from pathlib import Path
 import numpy as np
+from os import listdir
+from os.path import isfile, join
 
 
 # class Model(nn.Module):
@@ -61,7 +63,7 @@ class Model(nn.Module):
 
 
 def setup_model(frames_per_observation, input_state_size, state_state_size, learning_rate):
-    input_layer_size = frames_per_observation*(1+(state_state_size*2))
+    input_layer_size = frames_per_observation * (1 + (state_state_size * 2))
     model = Model(input_layer_size, input_state_size)
     model.share_memory()
 
@@ -70,14 +72,36 @@ def setup_model(frames_per_observation, input_state_size, state_state_size, lear
     return model, optimizer
 
 
-def load_model(model, optimizer, player_idx):
-    path = "data/eval/{}/model/{}".format(config.settings['run_name'], player_idx)
+def load_model(model, optimizer, player_idx, episode_number, device):
+    for ep_num in reversed(range(-1, episode_number - 1)):
+        path = "data/eval/{}/model/{}/{}".format(config.settings['run_name'], player_idx, ep_num)
 
-    model.load_state_dict(
-        torch.load("{}/{}.model".format(path, config.settings['model_file']),
-                   map_location=lambda storage, loc: storage))
-    optimizer.load_state_dict(torch.load("{}/{}.optim".format(path, config.settings['model_file'])))
-    print("loaded model = {}".format("{}/{}.model".format(path, config.settings['model_file'])))
+        model_files = [f for f in listdir(path) if isfile(join(path, f))]
+        model_path = None
+        optim_path = None
+        for mf in model_files:
+            if mf.endswith(".model"):
+                model_path = "{}/{}".format(path, mf)
+            else:
+                optim_path = "{}/{}".format(path, mf)
+
+        if model_path is None:
+            print("no model in episode={} going to prev".format(ep_num))
+            continue
+
+        print("loading model={}".format(path))
+
+        model.load_state_dict(torch.load(model_path, map_location=device))
+        optimizer.load_state_dict(torch.load(optim_path))
+        for state in optimizer.state.values():
+            for k, v in state.items():
+                if isinstance(v, torch.Tensor):
+                    state[k] = v.cuda()
+        print("loaded model = {}".format(model_path))
+        print("loaded optimizer = {}".format(optim_path))
+        break
+
+    return model, optimizer
 
 
 def save_model(model, optim, player_idx, episode_num):
@@ -99,10 +123,6 @@ def weights_init_uniform_rule(m):
     if classname.find('Linear') != -1:
         # get the number of the inputs
         n = m.in_features
-        y = 1.0/np.sqrt(n)
+        y = 1.0 / np.sqrt(n)
         m.weight.data.uniform_(-y, y)
         m.bias.data.fill_(0)
-
-
-
-

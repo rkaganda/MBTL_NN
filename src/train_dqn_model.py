@@ -95,16 +95,6 @@ def load_reward_data(reward_paths):
     return full_data
 
 
-# def save_model(model, optim, model_path):
-#     dt_str = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-#
-#     torch.save(model.state_dict(), "{}/model/{}.model".format(model_path, dt_str))
-#     torch.save(optim.state_dict(), "{}/optim/{}.optim".format(model_path, dt_str))
-#
-#     print("{}.model saved".format(dt_str))
-#     print("{}.optim saved".format(dt_str))
-
-
 def create_dataset(data):
     state_tensor = torch.Tensor(data['state']).to(device)
     action_tensor = torch.Tensor(data['action']).to(device)
@@ -115,14 +105,9 @@ def create_dataset(data):
     return td.TensorDataset(state_tensor, action_tensor, reward_tensor, next_state_tensor, done)
 
 
-def train(model,  target, optim, criterion, data, batch_size):
-    # state = Variable(data[0]).to(device)
-    # next_state = Variable(data[0]).to(device)
-    # actions = Variable(data[1]).to(device)
-    # rewards = Variable(data[2]).to(device)
+def train(model, target, optim, criterion, data, batch_size):
     state = Variable(data[0])
     next_states = Variable(data[3])
-    # actions = Variable(data[1]).unsqueeze(1)
     actions = Variable(data[1])
     rewards = Variable(data[2])
     done = Variable(data[4])
@@ -130,17 +115,11 @@ def train(model,  target, optim, criterion, data, batch_size):
     model.train()
     train_loss = 0
 
-    logger.debug("actions.size()={}".format(actions.size()))
+    # pred_q = model(state)
+    #
+    # pred_q = pred_q.gather(1, actions.type(torch.int64))
 
-    logger.debug("state.size()={}".format(state.size()))
-
-    pred_q = model(state)
-
-    logger.debug("pred_q.size()={}".format(pred_q.size()))
-
-    pred_q = pred_q.gather(1, actions.type(torch.int64))
-
-    # pred_q = model(state).gather(1, actions.type(torch.int64))
+    pred_q = model(state).gather(1, actions.type(torch.int64))
     next_state_q_vals = torch.zeros(batch_size).to(device)
 
     for idx, next_state in enumerate(next_states):
@@ -152,16 +131,17 @@ def train(model,  target, optim, criterion, data, batch_size):
 
     better_pred = (rewards + next_state_q_vals).unsqueeze(1)
 
-    loss = F.smooth_l1_loss(pred_q, better_pred)
+    loss = F.smooth_l1_loss(pred_q, better_pred).to(device)
     optim.zero_grad()
     loss.backward()
     for param in model.parameters():
         param.grad.data.clamp_(-1, 1)
+        param.grad.to(device)
     optim.step()
 
     train_loss += loss.item()
 
-    return train_loss
+    return train_loss, optim.get_last_lr()
 
 
 def train_model(reward_paths, stats_path, model, target, optim, epochs, episode_num):
@@ -182,10 +162,11 @@ def train_model(reward_paths, stats_path, model, target, optim, epochs, episode_
 
     for epoch in tqdm(range(0, epochs)):
         for step, batch_data in enumerate(train_loader):
-            train_loss = train(model, target, optim, criterion, batch_data, batch_size)
+            train_loss, lr = train(model, target, optim, criterion, batch_data, batch_size)
             stats[step] = {
                 "batch_size": len(batch_data[0]),
-                "loss": train_loss
+                "loss": train_loss,
+                "learning rate": lr
             }
             break
 

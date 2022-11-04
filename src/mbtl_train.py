@@ -153,13 +153,13 @@ def capture_rounds(round_num):
     do_inputs_processes = dict()
     input_indices = dict()
 
-    for p in range(0, 1):
+    for p in range(0, 2):
         eval_statuses_[p] = manager.dict()
         eval_statuses_[p]['kill_eval'] = False  # eval die
         eval_statuses_[p]['storing_eval'] = False  # eval storing data
         eval_statuses_[p]['eval_ready'] = False  # eval ready generate inputs
 
-        input_list, neutral_index = mbtl_input.create_input_list(0)
+        input_list, neutral_index = mbtl_input.create_input_list(p)
         input_indices[p] = Value('i', neutral_index)
 
         eval_w = EvalWorker(
@@ -245,6 +245,6 @@ def collect_data(capture_count):
 
 if __name__ == "__main__":
     mp.set_start_method('spawn')
-    collect_data(1)
+    collect_data(4)
 
     # test_no_inputs()
