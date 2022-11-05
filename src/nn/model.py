@@ -96,7 +96,7 @@ def load_model(model, optimizer, player_idx, episode_number, device):
         for state in optimizer.state.values():
             for k, v in state.items():
                 if isinstance(v, torch.Tensor):
-                    state[k] = v.cuda()
+                    state[k] = v.to(device)
         print("loaded model = {}".format(model_path))
         print("loaded optimizer = {}".format(optim_path))
         break

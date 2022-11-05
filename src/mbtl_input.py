@@ -265,6 +265,7 @@ def create_input_list(player_index):
 def do_inputs(input_index, input_list, die, env_status):
     inputs_held = set()
     inputs_hold = set()
+    inputs_cleared = False
 
     while not die.is_set():
         if not env_status['round_done']:
@@ -281,6 +282,9 @@ def do_inputs(input_index, input_list, die, env_status):
             release_inputs.clear()
             inputs_held = copy.deepcopy(inputs_hold)
         else:
+            if not inputs_cleared:
+                for k in inputs_held:
+                    ReleaseKey(k)
             time.sleep(.001)
     print("do_inputs die..")
     # aiu
