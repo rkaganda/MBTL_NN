@@ -163,7 +163,6 @@ class EvalWorker(mp.Process):
         train_dqn_model.train_model(reward_paths, stats_path, self.model, self.target, self.optimizer,
                                     config.settings['epochs'],
                                     self.episode_number)
-
     def run(self):
         try:
             self.setup_model()
@@ -224,7 +223,14 @@ class EvalWorker(mp.Process):
 
                                 detached_out = out_tensor.detach().cpu()
                             try:
-                                action_index = torch.argmax(detached_out).numpy()
+                                if config.settings['use_best_action']:
+                                    action_index = torch.argmax(detached_out).numpy()
+                                else:
+                                    r = torch.clone(detached_out)
+                                    r = r + torch.abs(torch.min(r))
+                                    r = r / torch.sum(r)
+
+                                    action_index = np.random.choice(r.size(0), 1, p=r.numpy())[0]
                                 # print("action_index={}".format(action_index))
                             except RuntimeError as e:
                                 print("in_tensor={}".format(in_tensor))

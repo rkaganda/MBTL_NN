@@ -141,7 +141,7 @@ def train(model, target, optim, criterion, data, batch_size):
 
     train_loss += loss.item()
 
-    return train_loss, optim.get_last_lr()
+    return train_loss, 0
 
 
 def train_model(reward_paths, stats_path, model, target, optim, epochs, episode_num):
