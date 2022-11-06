@@ -25,7 +25,7 @@ learning_rate: 1e-5
 final_epsilon:  .01
 initial_epsilon: .01
 epsilon_decay: 2
-use_best_action: True
+use_best_action: False
 
 
 tau: 50
