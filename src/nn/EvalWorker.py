@@ -148,7 +148,7 @@ class EvalWorker(mp.Process):
         reward_path = "data/eval/{}/reward/{}/{}".format(config.settings['run_name'], self.player_idx,
                                                          self.episode_number)
         eval_path = "data/eval/{}/evals/{}/{}".format(config.settings['run_name'], self.player_idx, self.episode_number)
-        stats_path = "data/eval/{}/stats".format(config.settings['run_name'], self.player_idx)
+        stats_path = "data/eval/{}/stats/{}".format(config.settings['run_name'], self.player_idx)
         calc_reward.generate_rewards(
             reward_path=reward_path,
             eval_path=eval_path,
@@ -163,6 +163,7 @@ class EvalWorker(mp.Process):
         train_dqn_model.train_model(reward_paths, stats_path, self.model, self.target, self.optimizer,
                                     config.settings['epochs'],
                                     self.episode_number)
+
     def run(self):
         try:
             self.setup_model()
