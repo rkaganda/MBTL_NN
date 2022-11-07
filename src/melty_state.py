@@ -11,6 +11,7 @@ def get_minmax():
     minmax['x_spac'] = dict()
     minmax['x_spac']['max'] = abs(state_format['minmax']['x_posi']['max'] - state_format['minmax']['x_posi']['min'])
     minmax['x_spac']['min'] = 0
+    minmax['y_spac'] = dict()
     minmax['y_spac']['max'] = abs(state_format['minmax']['y_posi']['max'] - state_format['minmax']['y_posi']['min'])
     minmax['y_spac']['min'] = 0
 
