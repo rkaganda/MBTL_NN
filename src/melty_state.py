@@ -1,3 +1,5 @@
+import copy
+
 import config
 import json
 
@@ -19,14 +21,16 @@ def get_minmax():
 
 
 def get_attributes():
-    attrib = state_format['attrib']
-    attrib.append('x_spacing')
-    attrib.append('y_spacing')
+    state_format['game_attrib'] = copy.deepcopy(state_format['attrib'])
+    state_format['attrib'].append('x_spac')
+    state_format['attrib'].append('y_spac')
+
+    return state_format['attrib'], state_format['game_attrib']
 
 
 def calc_extra_states(game_state):
     for p_idx in [0, 1]:
         game_state[p_idx]['x_spac'] = abs(game_state[p_idx]['x_posi'] - game_state[1-p_idx]['x_posi'])
-        game_state[p_idx]['x_spac'] = abs(game_state[p_idx]['y_posi'] - game_state[1-p_idx]['y_posi'])
+        game_state[p_idx]['y_spac'] = abs(game_state[p_idx]['y_posi'] - game_state[1-p_idx]['y_posi'])
 
     return game_state

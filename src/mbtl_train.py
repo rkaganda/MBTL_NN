@@ -27,10 +27,10 @@ from nn.EvalWorker import EvalWorker
 state_format = dict()
 state_format['directions'] = config.settings['directions']
 state_format['buttons'] = config.settings['buttons']
-state_format['minax'] = melty_state.get_minmax()
-state_format['attrib'] = melty_state.get_attributes()
+state_format['minmax'] = melty_state.get_minmax()
+state_format['attrib'], attrib_keys = melty_state.get_attributes()
 
-attrib_keys = list(state_format['attrib'])
+# attrib_keys = list(state_format['game_attrib'])
 
 logging.basicConfig(filename='logs/train.log', level=logging.DEBUG, format='%(asctime)s %(levelname)-8s %(message)s')
 logger = logging.getLogger(__name__)

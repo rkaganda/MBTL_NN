@@ -1,6 +1,8 @@
 run_name: "random_action_test"
 minmax_file: "data/reduced_minmax.json"
 
+
+
 directions:
   - "1"
   - "2"
@@ -25,7 +27,7 @@ learning_rate: 1e-5
 final_epsilon:  .01
 initial_epsilon: 1
 epsilon_decay: 100
-use_best_action: False
+use_best_action: True
 
 
 tau: 50
