@@ -91,7 +91,6 @@ def load_reward_data(reward_paths):
         done = [0] * len(next_state)
         done[-1] = 1
         full_data['done'] = full_data['done'] + done
-        break
     return full_data
 
 
@@ -120,7 +119,7 @@ def train(model, target, optim, criterion, data, batch_size):
     # pred_q = pred_q.gather(1, actions.type(torch.int64))
 
     pred_q = model(state).gather(1, actions.type(torch.int64))
-    next_state_q_vals = torch.zeros(batch_size).to(device)
+    next_state_q_vals = torch.zeros(len(data[0])).to(device)
 
     for idx, next_state in enumerate(next_states):
         if done[idx] == 1:
@@ -164,6 +163,7 @@ def train_model(reward_paths, stats_path, model, target, optim, epochs, episode_
         for step, batch_data in enumerate(train_loader):
             train_loss, lr = train(model, target, optim, criterion, batch_data, batch_size)
             stats[step] = {
+                "epoch": epoch,
                 "batch_size": len(batch_data[0]),
                 "loss": train_loss,
                 "learning rate": lr
