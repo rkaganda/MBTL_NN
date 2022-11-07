@@ -14,7 +14,7 @@ import cfg_tl
 import sub_tl
 
 import multiprocessing as mp
-from multiprocessing import Process, Manager, Event
+from multiprocessing import Process, Manager, Event, Value
 # import torch.multiprocessing as mp
 # from torch.multiprocessing import Process, Manager, Event
 import logging
@@ -26,7 +26,8 @@ from nn.EvalWorker import EvalWorker
 # load minmax
 with open(config.settings['minmax_file']) as f:
     state_format = json.load(f)
-    state_format['input'] = config.settings['valid_inputs']
+    state_format['directions'] = config.settings['directions']
+    state_format['buttons'] = config.settings['buttons']
 
 attrib_keys = list(state_format['attrib'])
 
@@ -50,7 +51,7 @@ def get_state_data(cfg):
     return state_data
 
 
-def monitor_state(game_states, input_states, timer_log, env_status, eval_statuses, timer_max):
+def monitor_state(game_states, input_indices, timer_log, env_status, eval_statuses, timer_max):
     cfg = cfg_tl
     sub = sub_tl
 
@@ -103,8 +104,9 @@ def monitor_state(game_states, input_states, timer_log, env_status, eval_statuse
                     timer_log.append(timer)
                     game_states.append({
                         'game': get_state_data(cfg),
-                        'input': [copy.deepcopy(inp_) for _, inp_ in input_states.items()]
+                        'input': [v.value for _, v in input_indices.items()]
                     })
+
                     timer_old = timer  # store last time data was logged
                     time.sleep(0.004)  # データが安定するまで待機 # Wait for data to stabilize
 
@@ -149,16 +151,16 @@ def capture_rounds(round_num):
     eval_workers = dict()
     kill_inputs_process = Event()
     do_inputs_processes = dict()
-    input_states = Manager().dict()
+    input_indices = dict()
 
-    for p in range(0, 1):
+    for p in range(0, 2):
         eval_statuses_[p] = manager.dict()
         eval_statuses_[p]['kill_eval'] = False  # eval die
         eval_statuses_[p]['storing_eval'] = False  # eval storing data
         eval_statuses_[p]['eval_ready'] = False  # eval ready generate inputs
 
-        input_states[p] = manager.dict()  # input stats for eval
-        input_states[p] = mbtl_input.create_input_dict(input_states[p])
+        input_list, neutral_index = mbtl_input.create_input_list(p)
+        input_indices[p] = Value('i', neutral_index)
 
         eval_w = EvalWorker(
             game_states=game_states_,
@@ -166,7 +168,8 @@ def capture_rounds(round_num):
             eval_status=eval_statuses_[p],
             frames_per_evaluation=frames_per_observation,
             reaction_delay=reaction_delay,
-            input_state=input_states[p],
+            input_index=input_indices[p],
+            input_index_max=len(input_list)-1,
             state_format=state_format,
             learning_rate=learning_rate,
             player_idx=p,
@@ -176,11 +179,11 @@ def capture_rounds(round_num):
 
         do_input_process = Process(
             target=mbtl_input.do_inputs,
-            args=(input_states[p], mbtl_input.mapping_dicts[p], kill_inputs_process, env_status_))
+            args=(input_indices[p], input_list, kill_inputs_process, env_status_))
         do_inputs_processes[p] = do_input_process
 
     monitor_mbtl_process = Process(target=monitor_state,
-                                   args=(game_states_, input_states, timer_log_, env_status_, eval_statuses_, timer_max))
+                                   args=(game_states_, input_indices, timer_log_, env_status_, eval_statuses_, timer_max))
 
     print("starting")
     logger.debug("starting")
@@ -242,6 +245,6 @@ def collect_data(capture_count):
 
 if __name__ == "__main__":
     mp.set_start_method('spawn')
-    collect_data(10)
+    collect_data(20)
 
     # test_no_inputs()

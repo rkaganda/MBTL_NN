@@ -22,3 +22,6 @@ Fighting_Game_Indicator/
 *.ipynb
 
 
+/src/test.py
+/src/TEST_INPUT.py
+/input_test.py

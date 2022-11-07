@@ -1,6 +1,9 @@
 import time
 import logging
 import traceback
+import datetime
+import math
+import random
 
 import multiprocessing as mp
 import numpy as np
@@ -14,7 +17,7 @@ import nn.model as model
 import nn.eval_util as eval_util
 import config
 import calc_reward
-import train_model
+import train_dqn_model
 
 logging.basicConfig(filename='./logs/train.log', level=logging.DEBUG, format='%(asctime)s %(levelname)-8s %(message)s')
 logger = logging.getLogger(__name__)
@@ -24,7 +27,8 @@ torch.set_default_dtype(torch.float64)
 
 
 class EvalWorker(mp.Process):
-    def __init__(self, game_states, frames_per_evaluation, reaction_delay, env_status, eval_status, input_state, state_format,
+    def __init__(self, game_states, frames_per_evaluation, reaction_delay, env_status, eval_status,
+                 input_index, input_index_max, state_format,
                  learning_rate, player_idx, frame_list):
         super(EvalWorker, self).__init__()
         self.states = game_states
@@ -32,7 +36,8 @@ class EvalWorker(mp.Process):
         self.reaction_delay = reaction_delay
         self.env_status = env_status
         self.eval_status = eval_status
-        self.input_state = input_state
+        self.input_index = input_index
+        self.input_index_max = input_index_max
         self.learning_rate = learning_rate
         self.player_idx = player_idx
         self.frame_list = frame_list
@@ -42,7 +47,12 @@ class EvalWorker(mp.Process):
         self.model = None
         self.optimizer = None
 
+        self.target = None
+
+        self.episode_number = 0
+
         self.run_count = 1
+        self.epsilon = 1
 
     # normalize the state attributes between 0, 1 using precalculated min max
     def normalize_state(self, state):
@@ -67,36 +77,52 @@ class EvalWorker(mp.Process):
                 norm_state['game'].append((game_state[p_idx][attrib] - minmax[attrib]['min']) / (
                     min_max_diff) if min_max_diff != 0 else 0)
 
-        # normalize inputs
-        input_state = state['input'][self.player_idx]
-        norm_state['input'] = list()
-        for i_ in self.state_format['input']:  # for each input
-            norm_state['input'].append(input_state[i_])
+        # normalize input
+        input_index = state['input'][self.player_idx]
+        # print("input_index = {}".format(input_index))
+        norm_state['input'] = input_index / (self.input_index_max + 1)
 
         return norm_state
 
     def setup_model(self):
         self.model, self.optimizer = model.setup_model(
             frames_per_observation=self.frames_per_evaluation,
-            input_state_size=len(self.input_state),
+            input_state_size=self.input_index_max + 1,
             state_state_size=len(self.state_format['attrib']),
             learning_rate=self.learning_rate
         )
 
-        if config.settings['model_file'] is not None:
-            model.load_model(self.model, self.optimizer, self.player_idx)
+        self.target, _ = model.setup_model(
+            frames_per_observation=self.frames_per_evaluation,
+            input_state_size=self.input_index_max + 1,
+            state_state_size=len(self.state_format['attrib']),
+            learning_rate=self.learning_rate
+        )
+        self.episode_number, self.run_count = eval_util.get_next_episode(player_idx=self.player_idx)
+
+        if self.episode_number > 0:
+            print("resuming player:{} on eps:{} run_count:{}".format(self.player_idx, self.episode_number,
+                                                                     self.run_count))
+            model.load_model(self.model, self.optimizer, self.player_idx, self.episode_number, device)
             print("loaded model")
         else:
             print("fresh model")
-            model.save_model(self.model, self.optimizer, self.player_idx)
+            torch.manual_seed(0)
 
-        self.model.to(device)
-        self.model.eval()
+            model.weights_init_uniform_rule(model)
+
+            model.save_model(self.model, self.optimizer, self.player_idx, episode_num=-1)
+
+        self.target.load_state_dict(self.model.state_dict())
+        self.model = self.model.to(device)
+        self.target = self.target.to(device)
+
+        self.target.eval()
 
         # warm up model
         with torch.no_grad():
             in_tensor = torch.ones(
-                self.frames_per_evaluation * (len(self.input_state) + (len(self.state_format['attrib']) * 2))).to(device)
+                self.frames_per_evaluation * (1 + (len(self.state_format['attrib']) * 2))).to(device)
             out_tensor = self.model(in_tensor)
 
     def round_cleanup(self, normalized_states, model_output):
@@ -105,24 +131,38 @@ class EvalWorker(mp.Process):
             self.states,
             model_output,
             self.state_format,
-            self.player_idx
+            self.player_idx,
+            self.episode_number,
         )
+        if self.run_count % config.settings['tau'] == 0:
+            print("loading target from model")
+            self.target.load_state_dict(self.model.state_dict())
 
         if config.settings['save_model'] and (self.run_count % config.settings['count_save']) == 0:
             print("epoch cleanup...")
             self.reward_train()
-            model.save_model(self.model, self.optimizer, self.player_idx)
+            model.save_model(self.model, self.optimizer, self.player_idx, episode_num=self.episode_number)
+            self.episode_number += 1
 
     def reward_train(self):
-        reward_path = "data/eval/{}/reward/{}".format(config.settings['run_name'], self.player_idx)
-        eval_path = "data/eval/{}/evals/{}".format(config.settings['run_name'], self.player_idx)
+        reward_path = "data/eval/{}/reward/{}/{}".format(config.settings['run_name'], self.player_idx,
+                                                         self.episode_number)
+        eval_path = "data/eval/{}/evals/{}/{}".format(config.settings['run_name'], self.player_idx, self.episode_number)
+        stats_path = "data/eval/{}/stats/{}".format(config.settings['run_name'], self.player_idx)
         calc_reward.generate_rewards(
             reward_path=reward_path,
             eval_path=eval_path,
             reward_columns=config.settings['reward_columns'][self.player_idx],
             falloff=config.settings['reward_falloff']
         )
-        train_model.train_model(reward_path, self.model, self.optimizer, config.settings['epochs'])
+
+        reward_paths = list()
+        for eps in range(0, self.episode_number + 1):
+            reward_paths.append(
+                "data/eval/{}/reward/{}/{}".format(config.settings['run_name'], self.player_idx, eps))
+        train_dqn_model.train_model(reward_paths, stats_path, self.model, self.target, self.optimizer,
+                                    config.settings['epochs'],
+                                    self.episode_number)
 
     def run(self):
         try:
@@ -133,6 +173,11 @@ class EvalWorker(mp.Process):
             model_output = dict()
             last_normalized_index = 0
             last_evaluated_index = 0
+
+            # RNG
+            final_epsilon = config.settings['final_epsilon']
+            initial_epsilon = config.settings['initial_epsilon']
+            epsilon_decay = config.settings['epsilon_decay']
 
             self.eval_status['eval_ready'] = True
             while not self.eval_status['kill_eval']:
@@ -150,6 +195,14 @@ class EvalWorker(mp.Process):
                         if ((last_normalized_index - self.reaction_delay) >= last_evaluated_index) and (
                                 (len(normalized_states) - self.reaction_delay) >= self.frames_per_evaluation):
 
+                            # exploration calculation
+                            esp_count = self.run_count
+
+                            eps_threshold = final_epsilon + (initial_epsilon - final_epsilon) * \
+                                            math.exp(-1. * esp_count / epsilon_decay)
+
+                            self.epsilon = eps_threshold
+
                             # create slice for evaluation
                             evaluation_frames = normalized_states[:-self.reaction_delay]
                             evaluation_frames = evaluation_frames[-self.frames_per_evaluation:]
@@ -157,35 +210,50 @@ class EvalWorker(mp.Process):
                             # flatten for input into model
                             flat_frames = []
                             for f_ in evaluation_frames:
-                                flat_frames = flat_frames + f_['input'] + f_['game']
+                                flat_frames = flat_frames + [f_['input']] + f_['game']
 
-                            # create tensor
-                            in_tensor = torch.Tensor(flat_frames).to(device)
+                            if random.random() < eps_threshold:
+                                detached_out = torch.Tensor(np.random.rand(self.input_index_max + 1))
+                            else:
+                                # create tensor
+                                in_tensor = torch.Tensor(flat_frames).to(device)
 
-                            # input data into model
-                            with torch.no_grad():
-                                out_tensor = self.model(in_tensor)
+                                # input data into model
+                                with torch.no_grad():
+                                    out_tensor = self.model(in_tensor)
 
-                            detached_out = out_tensor.detach().cpu()
+                                detached_out = out_tensor.detach().cpu()
                             try:
-                                prob = torch.bernoulli(detached_out).numpy()
+                                if config.settings['use_best_action']:
+                                    action_index = torch.argmax(detached_out).numpy()
+                                else:
+                                    r = torch.clone(detached_out)
+                                    r = r + torch.abs(torch.min(r))
+                                    r = r / torch.sum(r)
+
+                                    action_index = np.random.choice(r.size(0), 1, p=r.numpy())[0]
+                                # print("action_index={}".format(action_index))
                             except RuntimeError as e:
                                 print("in_tensor={}".format(in_tensor))
-                                print("detached_out={}".format(detached_out))
+                                print("detached_out={}".format(action_index))
                                 raise e
 
-                            for idx, key in enumerate(self.state_format['input']):
-                                self.input_state[key] = 1 if prob[idx] == 1 else 0
+                            self.input_index.value = action_index
 
                             # store model output
                             model_output[last_evaluated_index] = {
                                 'output': list(detached_out.numpy()),
                                 'frame': self.frame_list[-1],
-                                'norm_frame': last_normalized_index,
+                                # 'state': flat_frames,
+                                'states': len(self.states),
+                                'norm_states': len(normalized_states),
+                                'last_evaluated_index': last_evaluated_index,
+                                'last_normalized_index': last_normalized_index,
                                 'window': [
                                     last_normalized_index - self.reaction_delay - self.frames_per_evaluation,
                                     last_normalized_index - self.reaction_delay - 1
                                 ],
+                                "epsilon": self.epsilon
                                 # 'input_tensor': flat_frames
                             }
 
@@ -194,6 +262,7 @@ class EvalWorker(mp.Process):
                     else:
                         pass  # no states yet
                 if not did_store and len(normalized_states) > 0:
+                    print("eps_threshold={}".format(self.epsilon))
                     logger.debug("{} eval cleanup".format(self.player_idx))
                     self.eval_status['eval_ready'] = False
                     logger.debug("{} stopping eval".format(self.player_idx))
