@@ -175,6 +175,7 @@ def capture_rounds(round_num):
             learning_rate=learning_rate,
             player_idx=p,
             frame_list=timer_log_,
+            neutral_index = neutral_index
         )
         eval_workers[p] = eval_w
 

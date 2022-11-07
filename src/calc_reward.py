@@ -178,7 +178,7 @@ def trim_reward_df(eval_state_df, reward_column):
     return eval_state_df
 
 
-def caclulate_reward_from_eval(file_path, reward_columns, falloff, player_idx, reaction_delay):
+def caclulate_reward_from_eval(file_path, reward_columns, falloff, player_idx, reaction_delay, neutral_index):
     file_dict = load_file(file_path)
 
     datetime_str = datetime.datetime.now().strftime("%Y%m%d_%H%M%S_%f")
@@ -197,26 +197,29 @@ def caclulate_reward_from_eval(file_path, reward_columns, falloff, player_idx, r
 
     eval_state_df = calculate_reward_df(eval_state_df, list(reward_columns.keys()), falloff)
 
-    eval_state_df = apply_invalid_input_reward(eval_state_df, player_idx)
+    eval_state_df = apply_invalid_input_reward(eval_state_df, player_idx, reaction_delay, neutral_index)
 
     output_with_input_and_reward = trim_reward_df(eval_state_df, 'reward_total_norm')
 
     return output_with_input_and_reward
 
 
-def apply_invalid_input_reward(e_df, player_idx):
+def apply_invalid_input_reward(e_df, player_idx, reaction_delay, neutral_index):
+    invalid_frame_window = 5
     motion_change_col = 'p_{}_motion_change'.format(player_idx)
     motion_type_col = 'p_{}_motion_type'.format(player_idx)
 
     e_df[motion_change_col] = e_df[motion_type_col].diff()
+    # change_index = e_df[e_df[motion_change_col] != 0].index.tolist()
     change_index = e_df[e_df[motion_change_col] != 0].index.tolist()
 
     valid_input_index = [v - 1 for v in change_index]
+    neutral_inputs = e_df[e_df['input'] == neutral_index].index.tolist()
 
-    valid_windows = set(itertools.chain.from_iterable([list(range(v - 10, v)) for v in valid_input_index]))
+    valid_windows = set(itertools.chain.from_iterable([list(range(v - invalid_frame_window, v)) for v in valid_input_index])).union(neutral_inputs)
     valid_windows = [v for v in valid_windows if v > 0]
     invalid_index = e_df[~e_df.index.isin(valid_windows)].index.tolist()
-    invalid_index = [v for v in invalid_index if v > 20]
+    invalid_index = [v for v in invalid_index if v > reaction_delay]
 
     e_df.loc[e_df.index[invalid_index], 'reward_total_norm'] = -1000
 
@@ -235,7 +238,7 @@ def generate_json_from_in_out_df(output_with_input_and_reward):
     return json_dict
 
 
-def generate_rewards(eval_path, reward_path, reward_columns, falloff, player_idx, reaction_delay):
+def generate_rewards(eval_path, reward_path, reward_columns, falloff, player_idx, reaction_delay, neutral_index):
     print(reward_path)
     Path("{}".format(reward_path)).mkdir(parents=True, exist_ok=True)
     onlyfiles = [f for f in listdir(eval_path) if isfile(join(eval_path, f))]
@@ -245,7 +248,7 @@ def generate_rewards(eval_path, reward_path, reward_columns, falloff, player_idx
             if file.startswith('eval_'):
                 reward_file = file.replace('eval_', 'reward_')
                 file_name = "{}/{}".format(eval_path, file)
-                df = caclulate_reward_from_eval(file_name, reward_columns, falloff, player_idx, reaction_delay)
+                df = caclulate_reward_from_eval(file_name, reward_columns, falloff, player_idx, reaction_delay, neutral_index)
                 file_json = generate_json_from_in_out_df(df)
 
                 with open("{}/{}".format(reward_path, reward_file), 'w') as f_writer:

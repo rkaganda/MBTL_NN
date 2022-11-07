@@ -30,7 +30,7 @@ torch.set_default_dtype(torch.float64)
 class EvalWorker(mp.Process):
     def __init__(self, game_states, frames_per_evaluation, reaction_delay, env_status, eval_status,
                  input_index, input_index_max, state_format,
-                 learning_rate, player_idx, frame_list):
+                 learning_rate, player_idx, frame_list, neutral_index):
         super(EvalWorker, self).__init__()
         self.states = game_states
         self.frames_per_evaluation = frames_per_evaluation
@@ -44,6 +44,7 @@ class EvalWorker(mp.Process):
         self.frame_list = frame_list
 
         self.state_format = state_format
+        self.neutral_index = neutral_index
 
         self.model = None
         self.optimizer = None
@@ -156,7 +157,8 @@ class EvalWorker(mp.Process):
             reward_columns=config.settings['reward_columns'][self.player_idx],
             falloff=config.settings['reward_falloff'],
             player_idx=self.player_idx,
-            reaction_delay=config.settings['reaction_delay']
+            reaction_delay=config.settings['reaction_delay'],
+            neutral_index=self.neutral_index
         )
 
         reward_paths = list()
