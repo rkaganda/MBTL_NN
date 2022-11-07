@@ -153,7 +153,9 @@ class EvalWorker(mp.Process):
             reward_path=reward_path,
             eval_path=eval_path,
             reward_columns=config.settings['reward_columns'][self.player_idx],
-            falloff=config.settings['reward_falloff']
+            falloff=config.settings['reward_falloff'],
+            player_idx=self.player_idx,
+            reaction_delay=config.settings['reaction_delay']
         )
 
         reward_paths = list()

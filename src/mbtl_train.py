@@ -21,13 +21,14 @@ import logging
 
 import config
 import mbtl_input
+import melty_state
 from nn.EvalWorker import EvalWorker
 
-# load minmax
-with open(config.settings['minmax_file']) as f:
-    state_format = json.load(f)
-    state_format['directions'] = config.settings['directions']
-    state_format['buttons'] = config.settings['buttons']
+state_format = dict()
+state_format['directions'] = config.settings['directions']
+state_format['buttons'] = config.settings['buttons']
+state_format['minax'] = melty_state.get_minmax()
+state_format['attrib'] = melty_state.get_attributes()
 
 attrib_keys = list(state_format['attrib'])
 
