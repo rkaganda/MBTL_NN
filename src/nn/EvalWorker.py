@@ -13,6 +13,7 @@ import torch.nn as nn
 # import torch.multiprocessing as mp
 
 import mbtl_input
+import melty_state
 import nn.model as model
 import nn.eval_util as eval_util
 import config
@@ -60,7 +61,7 @@ class EvalWorker(mp.Process):
 
         # normalize game state
         minmax = self.state_format['minmax']
-        game_state = state['game']
+        game_state = melty_state.calc_extra_states(state['game'])
         norm_state['game'] = list()
         for p_idx in [0, 1]:  # for each player state
             for attrib in self.state_format['attrib']:  # for each attribute

@@ -1,5 +1,5 @@
 run_name: "random_action_test"
-minmax_file: "data/expanded_minmax.json"
+minmax_file: "data/reduced_minmax.json"
 
 directions:
   - "1"
@@ -23,8 +23,8 @@ reaction_delay: 20
 learning_rate: 1e-5
 
 final_epsilon:  .01
-initial_epsilon: .01
-epsilon_decay: 2
+initial_epsilon: 1
+epsilon_decay: 100
 use_best_action: False
 
 
