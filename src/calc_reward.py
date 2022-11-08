@@ -244,8 +244,11 @@ def generate_rewards(eval_path, reward_path, reward_columns, falloff, player_idx
 
                 with open("{}/{}".format(reward_path, reward_file), 'w') as f_writer:
                     f_writer.write(json.dumps(file_json))
+
         except Exception as e:
             logger.debug("file_name={}/{}".format(eval_path, file))
+
+    return [reward_path]
 
 
 def main():

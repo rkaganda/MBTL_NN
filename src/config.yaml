@@ -29,7 +29,7 @@ initial_epsilon: 1
 epsilon_decay: 100
 use_best_action: True
 
-
+last_episode_only: True
 tau: 50
 batch_size: 512
 

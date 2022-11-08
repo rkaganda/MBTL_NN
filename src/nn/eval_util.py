@@ -40,7 +40,7 @@ def get_reward_paths(player_idx):
     reward_paths = []
 
     if os.path.exists(reward_path):
-        reward_paths = [f for f in listdir(reward_path) if not isfile(join(reward_path, f))]
+        reward_paths = ["{}/{}".format(reward_path, f) for f in listdir(reward_path) if not isfile(join(reward_path, f))]
 
     return reward_paths
 

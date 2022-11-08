@@ -151,7 +151,7 @@ class EvalWorker(mp.Process):
                                                          self.episode_number)
         eval_path = "data/eval/{}/evals/{}/{}".format(config.settings['run_name'], self.player_idx, self.episode_number)
         stats_path = "data/eval/{}/stats/{}".format(config.settings['run_name'], self.player_idx)
-        calc_reward.generate_rewards(
+        reward_paths = calc_reward.generate_rewards(
             reward_path=reward_path,
             eval_path=eval_path,
             reward_columns=config.settings['reward_columns'][self.player_idx],
@@ -161,8 +161,8 @@ class EvalWorker(mp.Process):
             hit_preframes=config.settings['hit_preframes'],
             reward_gamma=config.settings['reward_gamma']
         )
-
-        reward_paths = eval_util.get_reward_paths(self.player_idx)
+        if not config.settings['last_episode_only']:
+            reward_paths = eval_util.get_reward_paths(self.player_idx)
         train_dqn_model.train_model(reward_paths, stats_path, self.model, self.target, self.optimizer,
                                     config.settings['epochs'],
                                     self.episode_number)
