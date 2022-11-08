@@ -1,7 +1,5 @@
-run_name: "random_action_test"
+run_name: "roa_shiki_hit_reward"
 minmax_file: "data/reduced_minmax.json"
-
-
 
 directions:
   - "1"
@@ -21,8 +19,10 @@ buttons:
   - "d"
 
 frames_per_observation: 1
-reaction_delay: 20
-learning_rate: 1e-5
+reaction_delay: 1
+learning_rate: .001
+hit_preframes: 20
+reward_gamma: .8
 
 final_epsilon:  .01
 initial_epsilon: 1
@@ -31,10 +31,10 @@ use_best_action: True
 
 
 tau: 50
-batch_size: 128
+batch_size: 512
 
 count_save: 1
-epochs: 10
+epochs: 1
 
 timer_max: 9999999
 

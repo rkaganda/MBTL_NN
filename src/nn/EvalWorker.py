@@ -158,7 +158,8 @@ class EvalWorker(mp.Process):
             falloff=config.settings['reward_falloff'],
             player_idx=self.player_idx,
             reaction_delay=config.settings['reaction_delay'],
-            neutral_index=self.neutral_index
+            hit_preframes=config.settings['hit_preframes'],
+            reward_gamma=config.settings['reward_gamma']
         )
 
         reward_paths = list()
@@ -237,7 +238,6 @@ class EvalWorker(mp.Process):
                                     r = r / torch.sum(r)
 
                                     action_index = np.random.choice(r.size(0), 1, p=r.numpy())[0]
-                                # print("action_index={}".format(action_index))
                             except RuntimeError as e:
                                 print("in_tensor={}".format(in_tensor))
                                 print("detached_out={}".format(action_index))

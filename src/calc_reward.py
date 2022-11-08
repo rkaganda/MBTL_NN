@@ -113,61 +113,6 @@ def generate_diff(eval_state_df, reward_columns):
     return eval_state_df
 
 
-def apply_reward(eval_state_df, reward_column, reward_falloff):
-    reward_values = {}
-    eval_state_df["{}_reward".format(reward_column)] = 0
-    eval_state_df[reward_column].fillna(0, inplace=True)
-
-    for idx, row in eval_state_df[::-1].iterrows():
-        reward_values[idx] = {
-            "fall_off": (row[reward_column] / reward_falloff),
-            "interval": 0,
-            "value": row[reward_column]
-        }
-        actual_reward = 0
-        remove_idx = []
-        for r_key, r_item in reward_values.items():
-            actual_reward = actual_reward + r_item['value'] - (r_item['fall_off'] * r_item['interval'])
-
-            if r_item['interval'] == reward_falloff:
-                remove_idx.append(r_key)
-            else:
-                r_item['interval'] = r_item['interval'] + 1
-        eval_state_df.at[idx, "{}_reward".format(reward_column)] = actual_reward
-
-        for rem_idx in remove_idx:
-            del reward_values[rem_idx]
-
-
-def calculate_reward_df(eval_state_df, reward_columns, falloff):
-    reward_c = []
-
-    for idx, col in enumerate(reward_columns):
-        rc = "{}_diff".format(col)
-        apply_reward(eval_state_df, reward_column=rc, reward_falloff=falloff)
-        reward_c.append("{}_reward".format(rc))
-
-    eval_state_df['reward_total'] = 0
-
-    for r in reward_c:
-        eval_state_df['reward_total'] = eval_state_df['reward_total'] + \
-                                                      eval_state_df[r]
-
-    # eval_state_df['reward_total_norm'] = \
-    #     (eval_state_df['reward_total'] - eval_state_df['reward_total'].mean()) / \
-    #     eval_state_df['reward_total'].std()
-
-    eval_state_df['reward_total_norm'] = eval_state_df['reward_total']
-
-    # eval_state_df['reward_total_norm'] = \
-    #     (eval_state_df['reward_total'] - eval_state_df['reward_total'].min())/ \
-    #     (eval_state_df['reward_total'].max() - eval_state_df['reward_total'].min())
-
-    eval_state_df['reward_total_norm'].fillna(0, inplace=True)
-
-    return eval_state_df
-
-
 def trim_reward_df(eval_state_df, reward_column):
     eval_state_df.rename(columns={reward_column: "reward"}, inplace=True)
     state_columns = [c for c in eval_state_df.columns if c.startswith('state')]
@@ -178,7 +123,8 @@ def trim_reward_df(eval_state_df, reward_column):
     return eval_state_df
 
 
-def caclulate_reward_from_eval(file_path, reward_columns, falloff, player_idx, reaction_delay, neutral_index):
+def calculate_reward_from_eval(
+        file_path, reward_columns, falloff, player_idx, reaction_delay, hit_preframes, reward_gamma):
     file_dict = load_file(file_path)
 
     datetime_str = datetime.datetime.now().strftime("%Y%m%d_%H%M%S_%f")
@@ -195,13 +141,55 @@ def caclulate_reward_from_eval(file_path, reward_columns, falloff, player_idx, r
 
     eval_state_df = generate_diff(eval_state_df, reward_columns)
 
-    eval_state_df = calculate_reward_df(eval_state_df, list(reward_columns.keys()), falloff)
+    eval_state_df['reward'] = 0
 
-    eval_state_df = apply_invalid_input_reward(eval_state_df, player_idx, reaction_delay, neutral_index)
+    eval_state_df = apply_hit_segment_rewards(player_idx, eval_state_df, hit_preframes)
+
+    eval_state_df = apply_reward_discount(eval_state_df, reward_gamma)
 
     output_with_input_and_reward = trim_reward_df(eval_state_df, 'reward_total_norm')
 
     return output_with_input_and_reward
+
+
+def apply_reward_discount(df, gamma):
+    df['discounted_reward'] = df['reward']
+    for n in range(0, 5):
+        df['discounted_reward'] = (df['discounted_reward'] + df['discounted_reward'].shift(-1) * gamma) * .5
+
+        df['actual_reward'] = df.apply(
+            lambda x: x['reward'] if abs(x['reward']) > abs(x['discounted_reward']) else x['discounted_reward'], axis=1)
+
+    return df
+
+
+def apply_hit_segment_rewards(p_idx, df, hit_preframes):
+    # get start and stop of of hit
+    for p_i in range(0, 2):
+        hit_col = 'p_{}_hit'.format(p_i)
+        diff_col = 'p_{}_health_diff'.format(p_i)
+
+        # calculate hit changes
+        v = (df[hit_col] != df[hit_col].shift()).cumsum()
+        u = df.groupby(v)[hit_col].agg(['all', 'count'])
+        m = u['all'] & u['count'].ge(1)
+
+        # create hit segments
+        hit_segements = df.groupby(v).apply(lambda x: (x.index[0], x.index[-1]))[m]
+
+        health_lost_segs = {}
+        for hs in hit_segements:
+            # calcluate reward for entire hit segment
+            health_lost_segs[hs] = df[(df.index >= hs[0]) & (df.index <= hs[1])][diff_col].sum()
+
+        for idxs, val in health_lost_segs.items():  # for each hit segment
+            # apply reward to frames from hit start - hit_preframes to hit end
+            df.loc[(df.index <= idxs[1]) & (df.index > idxs[0] - hit_preframes), 'reward'] = val
+
+        # if p_i == 1 - p_idx:
+        #     for hs in hit_segements:
+        #         df.loc[(df.index<(hs-20))&(df.index>idx-20),'reward'] = df.loc[(df.index<idx)&(df.index>idx-20),'reward'] - 1000
+    return df
 
 
 def apply_invalid_input_reward(e_df, player_idx, reaction_delay, neutral_index):
@@ -216,7 +204,9 @@ def apply_invalid_input_reward(e_df, player_idx, reaction_delay, neutral_index):
     valid_input_index = [v - 1 for v in change_index]
     neutral_inputs = e_df[e_df['input'] == neutral_index].index.tolist()
 
-    valid_windows = set(itertools.chain.from_iterable([list(range(v - invalid_frame_window, v)) for v in valid_input_index])).union(neutral_inputs)
+    valid_windows = set(
+        itertools.chain.from_iterable([list(range(v - invalid_frame_window, v)) for v in valid_input_index])).union(
+        neutral_inputs)
     valid_windows = [v for v in valid_windows if v > 0]
     invalid_index = e_df[~e_df.index.isin(valid_windows)].index.tolist()
     invalid_index = [v for v in invalid_index if v > reaction_delay]
@@ -238,7 +228,7 @@ def generate_json_from_in_out_df(output_with_input_and_reward):
     return json_dict
 
 
-def generate_rewards(eval_path, reward_path, reward_columns, falloff, player_idx, reaction_delay, neutral_index):
+def generate_rewards(eval_path, reward_path, reward_columns, falloff, player_idx, reaction_delay, hit_preframes, reward_gamma):
     print(reward_path)
     Path("{}".format(reward_path)).mkdir(parents=True, exist_ok=True)
     onlyfiles = [f for f in listdir(eval_path) if isfile(join(eval_path, f))]
@@ -248,7 +238,8 @@ def generate_rewards(eval_path, reward_path, reward_columns, falloff, player_idx
             if file.startswith('eval_'):
                 reward_file = file.replace('eval_', 'reward_')
                 file_name = "{}/{}".format(eval_path, file)
-                df = caclulate_reward_from_eval(file_name, reward_columns, falloff, player_idx, reaction_delay, neutral_index)
+                df = calculate_reward_from_eval(file_name, reward_columns, falloff, player_idx, reaction_delay,
+                                                hit_preframes, reward_gamma)
                 file_json = generate_json_from_in_out_df(df)
 
                 with open("{}/{}".format(reward_path, reward_file), 'w') as f_writer:
