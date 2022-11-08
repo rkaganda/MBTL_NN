@@ -35,6 +35,16 @@ def store_eval_output(normalized_states, states, model_output, state_format, pla
         f_writer.write(json.dumps(config.settings))
 
 
+def get_reward_paths(player_idx):
+    reward_path = "data/eval/{}/reward/{}".format(config.settings['run_name'], player_idx)
+    reward_paths = []
+
+    if os.path.exists(reward_path):
+        reward_paths = [f for f in listdir(reward_path) if not isfile(join(reward_path, f))]
+
+    return reward_paths
+
+
 def get_next_episode(player_idx):
     eval_path = "data/eval/{}/evals/{}".format(config.settings['run_name'], player_idx)
 

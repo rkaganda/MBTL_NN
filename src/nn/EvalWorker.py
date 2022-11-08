@@ -162,10 +162,7 @@ class EvalWorker(mp.Process):
             reward_gamma=config.settings['reward_gamma']
         )
 
-        reward_paths = list()
-        for eps in range(0, self.episode_number + 1):
-            reward_paths.append(
-                "data/eval/{}/reward/{}/{}".format(config.settings['run_name'], self.player_idx, eps))
+        reward_paths = eval_util.get_reward_paths(self.player_idx)
         train_dqn_model.train_model(reward_paths, stats_path, self.model, self.target, self.optimizer,
                                     config.settings['epochs'],
                                     self.episode_number)
