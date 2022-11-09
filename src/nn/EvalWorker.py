@@ -30,7 +30,7 @@ torch.set_default_dtype(torch.float64)
 class EvalWorker(mp.Process):
     def __init__(self, game_states, frames_per_evaluation, reaction_delay, env_status, eval_status,
                  input_index, input_index_max, state_format,
-                 learning_rate, player_idx, frame_list, neutral_index):
+                 learning_rate, player_idx, frame_list, neutral_index, input_lookback):
         super(EvalWorker, self).__init__()
         self.states = game_states
         self.frames_per_evaluation = frames_per_evaluation
@@ -42,9 +42,12 @@ class EvalWorker(mp.Process):
         self.learning_rate = learning_rate
         self.player_idx = player_idx
         self.frame_list = frame_list
+        self.input_lookback = input_lookback
+        self.use_argmax = (random.random() < config.settings['use_best_action'])
 
         self.state_format = state_format
         self.neutral_index = neutral_index
+        self.norm_neut_index = neutral_index/(input_index_max-1)
 
         self.model = None
         self.optimizer = None
@@ -89,6 +92,7 @@ class EvalWorker(mp.Process):
     def setup_model(self):
         self.model, self.optimizer = model.setup_model(
             frames_per_observation=self.frames_per_evaluation,
+            input_lookback=self.input_lookback,
             input_state_size=self.input_index_max + 1,
             state_state_size=len(self.state_format['attrib']),
             learning_rate=self.learning_rate
@@ -96,6 +100,7 @@ class EvalWorker(mp.Process):
 
         self.target, _ = model.setup_model(
             frames_per_observation=self.frames_per_evaluation,
+            input_lookback=self.input_lookback,
             input_state_size=self.input_index_max + 1,
             state_state_size=len(self.state_format['attrib']),
             learning_rate=self.learning_rate
@@ -124,8 +129,10 @@ class EvalWorker(mp.Process):
         # warm up model
         with torch.no_grad():
             in_tensor = torch.ones(
-                self.frames_per_evaluation * (1 + (len(self.state_format['attrib']) * 2))).to(device)
+                (self.frames_per_evaluation * (len(self.state_format['attrib']) * 2)) + self.input_lookback).to(device)
             out_tensor = self.model(in_tensor)
+
+        self.use_argmax = (random.random() < config.settings['use_best_action'])
 
     def round_cleanup(self, normalized_states, model_output):
         eval_util.store_eval_output(
@@ -173,6 +180,7 @@ class EvalWorker(mp.Process):
             did_store = False
 
             normalized_states = list()
+            normalized_inputs = list()
             model_output = dict()
             last_normalized_index = 0
             last_evaluated_index = 0
@@ -192,6 +200,7 @@ class EvalWorker(mp.Process):
                         normalized_states.append(
                             self.normalize_state(self.states[last_normalized_index])
                         )
+                        normalized_inputs.append(normalized_states[-1]['input'])
                         last_normalized_index = last_normalized_index + 1
 
                         # if reaction time has passed, and we have enough frames to eval
@@ -210,10 +219,18 @@ class EvalWorker(mp.Process):
                             evaluation_frames = normalized_states[:-self.reaction_delay]
                             evaluation_frames = evaluation_frames[-self.frames_per_evaluation:]
 
+                            input_len = len(normalized_inputs)
+                            if input_len < self.input_lookback:
+                                input_frames = \
+                                    ([self.norm_neut_index] * (self.input_lookback - input_len)) + normalized_inputs
+                            else:
+                                input_frames = normalized_inputs[-self.input_lookback:]
+
                             # flatten for input into model
                             flat_frames = []
                             for f_ in evaluation_frames:
-                                flat_frames = flat_frames + [f_['input']] + f_['game']
+                                flat_frames = flat_frames + f_['game']
+                            flat_frames = input_frames + flat_frames
 
                             if random.random() < eps_threshold:
                                 detached_out = torch.Tensor(np.random.rand(self.input_index_max + 1))
@@ -227,7 +244,7 @@ class EvalWorker(mp.Process):
 
                                 detached_out = out_tensor.detach().cpu()
                             try:
-                                if config.settings['use_best_action']:
+                                if self.use_argmax:
                                     action_index = torch.argmax(detached_out).numpy()
                                 else:
                                     r = torch.clone(detached_out)
@@ -236,13 +253,15 @@ class EvalWorker(mp.Process):
 
                                     action_index = np.random.choice(r.size(0), 1, p=r.numpy())[0]
                             except RuntimeError as e:
-                                print("in_tensor={}".format(in_tensor))
-                                print("detached_out={}".format(action_index))
+                                logger.debug("in_tensor={}".format(in_tensor))
+                                logger.debug("detached_out={}".format(action_index))
+                                logger.exception(e)
                                 raise e
 
                             self.input_index.value = action_index
 
                             # store model output
+                            normalized_states[last_evaluated_index]['input'] = input_frames
                             model_output[last_evaluated_index] = {
                                 'output': list(detached_out.numpy()),
                                 'frame': self.frame_list[-1],
@@ -268,6 +287,7 @@ class EvalWorker(mp.Process):
                     logger.debug("{} eval cleanup".format(self.player_idx))
                     self.eval_status['eval_ready'] = False
                     logger.debug("{} stopping eval".format(self.player_idx))
+                    normalized_states = normalized_states[0:last_evaluated_index]
                     self.round_cleanup(normalized_states, model_output)
                     did_store = True
                     del normalized_states[:]
@@ -275,6 +295,8 @@ class EvalWorker(mp.Process):
                     last_normalized_index = 0
                     last_evaluated_index = 0
                     self.run_count = self.run_count + 1
+                    self.use_argmax = (random.random() < config.settings['use_best_action'])
+                    print("p{} use_argmax={}".format(self.player_idx, self.use_argmax))
                     logger.debug("{} finished cleanup".format(self.player_idx))
                     self.eval_status['storing_eval'] = False  # finished storing eval
         except Exception as identifier:

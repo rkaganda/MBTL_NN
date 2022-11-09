@@ -154,7 +154,7 @@ def capture_rounds(round_num):
     do_inputs_processes = dict()
     input_indices = dict()
 
-    for p in range(0, 2):
+    for p in range(0, 1):
         eval_statuses_[p] = manager.dict()
         eval_statuses_[p]['kill_eval'] = False  # eval die
         eval_statuses_[p]['storing_eval'] = False  # eval storing data
@@ -175,7 +175,8 @@ def capture_rounds(round_num):
             learning_rate=learning_rate,
             player_idx=p,
             frame_list=timer_log_,
-            neutral_index = neutral_index
+            neutral_index=neutral_index,
+            input_lookback=config.settings['input_lookback']
         )
         eval_workers[p] = eval_w
 

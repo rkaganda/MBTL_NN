@@ -45,7 +45,7 @@ def create_norm_state_df(file_dict):
 
     for index, item in enumerate(file_dict['normalized_states']):
         row = dict()
-        for idx, value in enumerate([item['input']] + item['game']):
+        for idx, value in enumerate(item['input'] + item['game']):
             row[idx] = value
         norm_dict[index] = row
 

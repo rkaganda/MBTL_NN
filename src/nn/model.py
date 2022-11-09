@@ -39,19 +39,15 @@ class Model(nn.Module):
         super(Model, self).__init__()
         # self.flatten = nn.Flatten()
         self.linear_relu_stack = nn.Sequential(
-            nn.Linear(input_size, 512),
+            nn.Linear(input_size, 128),
             nn.ReLU(),
             nn.Dropout(.20),
-            nn.Linear(512, 512),
+            nn.Linear(128, 256),
             nn.ReLU(),
             nn.Dropout(.20),
-            nn.Linear(512, 512),
+            nn.Linear(256, 128),
             nn.ReLU(),
-            nn.Dropout(.20),
-            nn.Linear(512, 512),
-            nn.ReLU(),
-            nn.Dropout(.20),
-            nn.Linear(512, output_size),
+            nn.Linear(128, output_size),
         )
         # self.activation = torch.nn.ReLU()
 
@@ -62,8 +58,9 @@ class Model(nn.Module):
         # return self.activation(out)
 
 
-def setup_model(frames_per_observation, input_state_size, state_state_size, learning_rate):
-    input_layer_size = frames_per_observation * (1 + (state_state_size * 2))
+def setup_model(frames_per_observation, input_lookback, input_state_size, state_state_size, learning_rate):
+    input_layer_size = (frames_per_observation * (state_state_size * 2)) + input_lookback
+    print("input_layer_size={}".format(input_layer_size))
     model = Model(input_layer_size, input_state_size)
     model.share_memory()
 

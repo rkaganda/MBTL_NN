@@ -1,4 +1,4 @@
-run_name: "roa_shiki_hit_reward"
+run_name: "input_lookback_test"
 minmax_file: "data/reduced_minmax.json"
 
 directions:
@@ -20,14 +20,15 @@ buttons:
 
 frames_per_observation: 1
 reaction_delay: 1
+input_lookback: 6
 learning_rate: .001
 hit_preframes: 20
 reward_gamma: .8
 
-final_epsilon:  .01
-initial_epsilon: 1
+final_epsilon:  0
+initial_epsilon: 0
 epsilon_decay: 100
-use_best_action: True
+use_best_action: 0
 
 last_episode_only: True
 tau: 50
