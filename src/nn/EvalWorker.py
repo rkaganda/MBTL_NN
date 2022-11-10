@@ -247,9 +247,10 @@ class EvalWorker(mp.Process):
                                 if self.use_argmax:
                                     action_index = torch.argmax(detached_out).numpy()
                                 else:
-                                    r = torch.clone(detached_out)
-                                    r = r + torch.abs(torch.min(r))
-                                    r = r / torch.sum(r)
+                                    r = torch.softmax(detached_out)
+                                    # r = torch.clone(detached_out)
+                                    # r = r + torch.abs(torch.min(r))
+                                    # r = r / torch.sum(r)
 
                                     action_index = np.random.choice(r.size(0), 1, p=r.numpy())[0]
                             except RuntimeError as e:
