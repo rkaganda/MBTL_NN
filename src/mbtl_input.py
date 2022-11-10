@@ -1,16 +1,17 @@
 import copy
 import ctypes
+import multiprocessing
 import random
 from ctypes import wintypes
 import time
 import logging
-
-# from torch.multiprocessing import Process, Manager, Event
-from multiprocessing import Process, Manager, Event
+from multiprocessing.sharedctypes import Synchronized
+from multiprocessing import Process, Manager, Event, Value
 
 import config
+from typing import Tuple
 
-logging.basicConfig(filename='logs/train.log', level=logging.DEBUG, format='%(asctime)s %(levelname)-8s %(message)s')
+logging.basicConfig(filename='../logs/train.log', level=logging.DEBUG, format='%(asctime)s %(levelname)-8s %(message)s')
 logger = logging.getLogger(__name__)
 
 user32 = ctypes.WinDLL('user32', use_last_error=True)
@@ -105,22 +106,7 @@ def ReleaseKey(hexKeyCode):
     user32.SendInput(1, ctypes.byref(x), ctypes.sizeof(x))
 
 
-# _P1_1 = [0x41, 0x53]  # as
-# _P1_2 = [0x53]  # s
-# _P1_3 = [0x53, 0x44]  # sd
-# _P1_4 = [0x41]  # a
-# _P1_6 = [0x44]  # d
-# _P1_7 = [0x57, 0x41]  # wa
-# _P1_8 = [0x57]  # w
-# _P1_9 = [0x57, 0x44]  # wd
-# _P1_A = [0x49]  # i
-# _P1_B = [0x55]  # u
-# _P1_C = [0x4F]  # o
-# _P1_D = [0x4A]  # j
-#
-# _P1_directions = [_P1_1, _P1_2, _P1_3, _P1_4, _P1_6, _P1_7, _P1_8, _P1_9, []]
-# _P1_buttons = [_P1_A, _P1_B, _P1_C, _P1_D]
-
+# action to game input mapping
 mapping_dicts = dict()
 
 mapping_dicts[0] = dict()
@@ -167,45 +153,34 @@ mapping_dicts[1]['buttons']['c'] = [0x4D]  # P2 C # m
 mapping_dicts[1]['buttons']['d'] = [0xBC]  # P2 D # ,
 
 
-def create_input_list(player_index):
-    directions = []
-    for idx, direction in enumerate(config.settings['directions']):
+def create_input_list(player_index: int) -> Tuple[list, int]:
+    """
+    generates list where index each is an action and the item is a list of keycodes for that action
+    :param player_index:
+    :return: list of keycodes, the index for the neutral/empty action
+    """
+    directions = []  # stores all possible key combinations
+    for idx, direction in enumerate(config.settings['directions']):  # populate list with each key combination
         directions.append(mapping_dicts[player_index]['directions'][direction])
 
-    directions_lists = []
+    directions_lists = []  # list for each possible direction
     for r in range(0, len(directions)):
         ar = [0] * 9
         ar[r] = 1
         directions_lists.append(ar)
 
-    # directions_lists = [[0, 0, 0, 1, 0, 0, 0, 0, 0]]
-
-    for d_list in directions_lists:
+    for d_list in directions_lists:  # populate direction list with key combinations
         for idx, value in enumerate(directions):
             if d_list[idx] == 1:
                 d_list[idx] = value
             else:
                 d_list[idx] = []
 
+    # create button combinations list
     buttons_list = []
     for idx, button in enumerate(config.settings['buttons']):
         buttons_list.append(mapping_dicts[player_index]['buttons'][button])
 
-    # combinations = []
-    # for r in range(0, len(buttons_list)):
-    #     if len(combinations) == 0:
-    #         combinations.append([0])
-    #         combinations.append([1])
-    #     else:
-    #         new_comb = []
-    #         for idx, c in enumerate(combinations):
-    #             new_a = copy.deepcopy(c)
-    #             new_b = copy.deepcopy(c)
-    #             new_a.append(0)
-    #             new_b.append(1)
-    #             new_comb.append(new_a)
-    #             new_comb.append(new_b)
-    #             combinations = copy.deepcopy(new_comb)
     combinations = [
         [0, 0, 0, 0],  # neutral
         [1, 0, 0, 0],  # a
@@ -232,7 +207,7 @@ def create_input_list(player_index):
 
     combined = []
     neutral_index = None
-    for idx, ar in enumerate(all_combinations):
+    for idx, ar in enumerate(all_combinations):  # create list with all direction + button combinations
         new_ar = []
         for val_ar in ar:
             new_ar = new_ar + val_ar
@@ -240,73 +215,51 @@ def create_input_list(player_index):
         if len(new_ar) == 0:
             neutral_index = idx
 
-    # print(neutral_index)
-    # print(combined)
     if neutral_index is None:
         neutral_index = 0
 
     return combined, neutral_index
 
 
-# input_pressed = dict()
-# for k_ in config.settings['valid_inputs']:
-#     input_pressed[k_] = False
-
-
-# def create_p2_input_dict():
-#     input_dict = Manager().dict()
-#
-#     for k in config.settings['valid_inputs']:
-#         input_dict[k] = 0
-#
-#     return input_dict
-
-
-def do_inputs(input_index, input_list, die, env_status):
-    inputs_held = set()
-    inputs_hold = set()
+def do_inputs(input_index, input_list: list, die, env_status):
+    """
+    keeps tracks and processes inputs each frame
+    :param input_index: the inputs for the current frame
+    :param input_list:  list of keys corresponding to each input/action
+    :param die: returns when die is set
+    :param env_status:
+    :return:
+    """
+    inputs_held = set()  # keys being held
+    inputs_hold = set()  # keys to hold
     inputs_cleared = False
 
     while not die.is_set():
-        if not env_status['round_done']:
-            time.sleep(.013)
-            inputs_hold.clear()
-            for k in input_list[input_index.value]:
-                if k not in inputs_held:
-                    PressKey(k)
-                inputs_hold.add(k)
-            release_inputs = (inputs_held - inputs_hold)
-            if len(release_inputs) > 0:
+        if not env_status['round_done']:  # if round is live
+            time.sleep(.013)  # sleep a frame
+            inputs_hold.clear()  # clear held inputs buffer
+            for k in input_list[input_index.value]:  # for each key
+                if k not in inputs_held:  # if key is not already being held
+                    PressKey(k)  # press key
+                inputs_hold.add(k)  # add key to hold
+            release_inputs = (inputs_held - inputs_hold)  # keys that where pressed last frame but not this frame
+            if len(release_inputs) > 0:  # if there are no keys to release
                 for k in release_inputs:
                     ReleaseKey(k)
             release_inputs.clear()
-            inputs_held = copy.deepcopy(inputs_hold)
-        else:
-            if not inputs_cleared:
-                for k in inputs_held:
+            inputs_held = copy.deepcopy(inputs_hold)  # hold inputs till next frame
+        else:  # round is over
+            if not inputs_cleared:  # have all the keys been released
+                for k in inputs_held:  # release all keys being held
                     ReleaseKey(k)
             time.sleep(.001)
-    print("do_inputs die..")
-    # aiu
-    print("do_inputs dead..")
-
-
-def random_inputs(input_dict, die):
-    while not die.is_set():
-        input_dict = randomize_inputs(input_dict)
-        # time.sleep(.013)
-        time.sleep(.013)
-    print("random_inputs dead..")
-
-
-def randomize_inputs(input_dict):
-    for k in input_dict.keys():
-        if random.randint(0, 1) == 1:
-            input_dict[k] = not input_dict[k]
-    return input_dict
 
 
 def reset_round():
+    """
+    resets practice mode after the round ends
+    :return:
+    """
     time.sleep(.001)
     # make sure every key is released
     for k in all_keys:

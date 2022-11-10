@@ -11,22 +11,22 @@ from os import listdir
 from os.path import isfile, join
 
 
-# class Model(nn.Module):
+# class Model(eval.Module):
 #     def __init__(self, input_size, output_size):
 #         super(Model, self).__init__()
-#         # self.flatten = nn.Flatten()
-#         self.linear_relu_stack = nn.Sequential(
-#             nn.Linear(input_size, 512),
-#             nn.ReLU(),
-#             nn.Linear(512, 512),
-#             nn.ReLU(),
-#             nn.Linear(512, 512),
-#             nn.ReLU(),
-#             nn.Linear(512, 512),
-#             nn.ReLU(),
-#             nn.Linear(512, output_size),
+#         # self.flatten = eval.Flatten()
+#         self.linear_relu_stack = eval.Sequential(
+#             eval.Linear(input_size, 512),
+#             eval.ReLU(),
+#             eval.Linear(512, 512),
+#             eval.ReLU(),
+#             eval.Linear(512, 512),
+#             eval.ReLU(),
+#             eval.Linear(512, 512),
+#             eval.ReLU(),
+#             eval.Linear(512, output_size),
 #         )
-#         self.activation = torch.nn.Sigmoid()
+#         self.activation = torch.eval.Sigmoid()
 #
 #     def forward(self, x):
 #         # x = self.flatten(x)
@@ -37,23 +37,19 @@ from os.path import isfile, join
 class Model(nn.Module):
     def __init__(self, input_size, output_size):
         super(Model, self).__init__()
-        # self.flatten = nn.Flatten()
+        # self.flatten = eval.Flatten()
         self.linear_relu_stack = nn.Sequential(
-            nn.Linear(input_size, 512),
+            nn.Linear(input_size, 128),
             nn.ReLU(),
             nn.Dropout(.20),
-            nn.Linear(512, 512),
+            nn.Linear(128, 256),
             nn.ReLU(),
             nn.Dropout(.20),
-            nn.Linear(512, 512),
+            nn.Linear(256, 128),
             nn.ReLU(),
-            nn.Dropout(.20),
-            nn.Linear(512, 512),
-            nn.ReLU(),
-            nn.Dropout(.20),
-            nn.Linear(512, output_size),
+            nn.Linear(128, output_size),
         )
-        # self.activation = torch.nn.ReLU()
+        # self.activation = torch.eval.ReLU()
 
     def forward(self, x):
         # x = self.flatten(x)
@@ -62,8 +58,9 @@ class Model(nn.Module):
         # return self.activation(out)
 
 
-def setup_model(frames_per_observation, input_state_size, state_state_size, learning_rate):
-    input_layer_size = frames_per_observation * (1 + (state_state_size * 2))
+def setup_model(frames_per_observation, input_lookback, input_state_size, state_state_size, learning_rate):
+    input_layer_size = (frames_per_observation * (state_state_size * 2)) + input_lookback
+    print("input_layer_size={}".format(input_layer_size))
     model = Model(input_layer_size, input_state_size)
     model.share_memory()
 
@@ -74,7 +71,7 @@ def setup_model(frames_per_observation, input_state_size, state_state_size, lear
 
 def load_model(model, optimizer, player_idx, episode_number, device):
     for ep_num in reversed(range(-1, episode_number - 1)):
-        path = "data/eval/{}/model/{}/{}".format(config.settings['run_name'], player_idx, ep_num)
+        path = "{}/eval/{}/model/{}/{}".format(config.settings['data_path'], config.settings['run_name'], player_idx, ep_num)
 
         model_files = [f for f in listdir(path) if isfile(join(path, f))]
         model_path = None
@@ -105,7 +102,7 @@ def load_model(model, optimizer, player_idx, episode_number, device):
 
 
 def save_model(model, optim, player_idx, episode_num):
-    path = "data/eval/{}/model/{}/{}/".format(config.settings['run_name'], player_idx, episode_num)
+    path = "{}/eval/{}/model/{}/{}/".format(config.settings['data_path'], config.settings['run_name'], player_idx, episode_num)
 
     Path(path).mkdir(parents=True, exist_ok=True)
 
