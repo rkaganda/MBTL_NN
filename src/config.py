@@ -11,7 +11,7 @@ log_levels = {
     'CRITICAL': logging.CRITICAL,
 }
 
-with open("config.yaml", 'r') as stream:
+with open("../config.yaml", 'r') as stream:
     try:
         settings = yaml.safe_load(stream)
         settings['log_level'] = log_levels[settings['log_level']]

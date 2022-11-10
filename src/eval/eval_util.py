@@ -1,17 +1,26 @@
 import copy
 import json
 import datetime
-from functools import singledispatch
 from pathlib import Path
 import config
-import torch
 import os
 from os import listdir
 from os.path import isfile, join
 
 
-def store_eval_output(normalized_states, states, model_output, state_format, player_idx, episode_number):
-    path = "data/eval/{}".format(config.settings['run_name'])
+def store_eval_output(normalized_states: list, states: dict, model_output: list, state_format: dict, player_idx: int,
+                      episode_number: int):
+    """
+    store the eval output for entire round
+    :param normalized_states:
+    :param states:
+    :param model_output:
+    :param state_format:
+    :param player_idx:
+    :param episode_number:
+    :return:
+    """
+    path = "{}/eval/{}".format(config.settings['data_path'], config.settings['run_name'])
     datetime_str = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
 
     states = copy.deepcopy(states)
@@ -28,25 +37,26 @@ def store_eval_output(normalized_states, states, model_output, state_format, pla
     Path("{}/model/{}/{}".format(path, player_idx, episode_number)).mkdir(parents=True, exist_ok=True)
     Path("{}/stats/{}".format(path, player_idx)).mkdir(parents=True, exist_ok=True)
 
-    with open("{}/evals/{}/{}/eval_{}.json".format(path, player_idx, episode_number, datetime_str),'a') as f_writer:
+    with open("{}/evals/{}/{}/eval_{}.json".format(path, player_idx, episode_number, datetime_str), 'a') as f_writer:
         f_writer.write(json.dumps(all_data))
 
-    with open("{}/config.json".format(path),'w') as f_writer:
+    with open("{}/config.json".format(path), 'w') as f_writer:
         f_writer.write(json.dumps(config.settings))
 
 
 def get_reward_paths(player_idx):
-    reward_path = "data/eval/{}/reward/{}".format(config.settings['run_name'], player_idx)
+    reward_path = "{}/eval/{}/reward/{}".format(config.settings['data_path'], config.settings['run_name'], player_idx)
     reward_paths = []
 
     if os.path.exists(reward_path):
-        reward_paths = ["{}/{}".format(reward_path, f) for f in listdir(reward_path) if not isfile(join(reward_path, f))]
+        reward_paths = ["{}/{}".format(reward_path, f) for f in listdir(reward_path) if
+                        not isfile(join(reward_path, f))]
 
     return reward_paths
 
 
 def get_next_episode(player_idx):
-    eval_path = "data/eval/{}/evals/{}".format(config.settings['run_name'], player_idx)
+    eval_path = "{}/eval/{}/evals/{}".format(config.settings['data_path'], config.settings['run_name'], player_idx)
 
     max_episode = 0
     run_count = 1
@@ -58,7 +68,6 @@ def get_next_episode(player_idx):
             if d.isnumeric():
                 if int(d) > max_episode:
                     max_episode = int(d)
-
         print("max_episode={}".format(max_episode))
 
         episode_dirs = [f for f in listdir(eval_path) if not isfile(join(eval_path, f))]
@@ -82,9 +91,3 @@ def get_next_episode(player_idx):
             print("no path {}".format(episode_path))
 
     return max_episode, run_count
-
-
-
-
-
-

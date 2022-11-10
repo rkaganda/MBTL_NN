@@ -4,7 +4,7 @@ import config
 import json
 
 # load minmax
-with open(config.settings['minmax_file']) as f:
+with open("{}/{}".format(config.settings['data_path'], config.settings['minmax_file'])) as f:
     state_format = json.load(f)
 
 

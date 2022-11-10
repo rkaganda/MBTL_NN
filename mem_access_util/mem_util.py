@@ -3,6 +3,7 @@ import os
 import time
 import ctypes
 import psutil
+import ctypes.wintypes
 
 
 wintypes = ctypes.wintypes

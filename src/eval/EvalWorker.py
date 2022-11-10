@@ -1,7 +1,5 @@
-import time
 import logging
 import traceback
-import datetime
 import math
 import random
 
@@ -9,16 +7,14 @@ import multiprocessing as mp
 import numpy as np
 
 import torch
-import torch.nn as nn
 # import torch.multiprocessing as mp
 
-import mbtl_input
 import melty_state
-import nn.model as model
-import nn.eval_util as eval_util
+import eval.model as model
+import eval.eval_util as eval_util
 import config
 import calc_reward
-import train_dqn_model
+from eval import train_dqn_model
 
 logging.basicConfig(filename='./logs/train.log', level=logging.DEBUG, format='%(asctime)s %(levelname)-8s %(message)s')
 logger = logging.getLogger(__name__)
@@ -28,9 +24,26 @@ torch.set_default_dtype(torch.float64)
 
 
 class EvalWorker(mp.Process):
-    def __init__(self, game_states, frames_per_evaluation, reaction_delay, env_status, eval_status,
-                 input_index, input_index_max, state_format,
-                 learning_rate, player_idx, frame_list, neutral_index, input_lookback):
+    def __init__(self, game_states: list, frames_per_evaluation: int, reaction_delay: int, env_status: dict,
+                 eval_status: dict,
+                 input_index: int, input_index_max: int, state_format: dict,
+                 learning_rate: float, player_idx: int, frame_list: list, neutral_index: int, input_lookback: int):
+        """
+
+        :param game_states: list of game states for the current round index by frame
+        :param frames_per_evaluation: num of state frames used for model input each frame
+        :param reaction_delay: num of frames to delay eval
+        :param env_status:
+        :param eval_status: status of this eval
+        :param input_index: current input index action
+        :param input_index_max: max input index
+        :param state_format: min, max values of each attrib used for norm
+        :param learning_rate: learning rate of the model
+        :param player_idx: index of player for this eval
+        :param frame_list: list of frame numbers
+        :param neutral_index: index for neutral action (no buttons pressed)
+        :param input_lookback: how many input frames add to model input
+        """
         super(EvalWorker, self).__init__()
         self.states = game_states
         self.frames_per_evaluation = frames_per_evaluation
@@ -43,24 +56,27 @@ class EvalWorker(mp.Process):
         self.player_idx = player_idx
         self.frame_list = frame_list
         self.input_lookback = input_lookback
-        self.use_argmax = (random.random() < config.settings['use_best_action'])
 
         self.state_format = state_format
         self.neutral_index = neutral_index
-        self.norm_neut_index = neutral_index/(input_index_max-1)
+        self.norm_neut_index = neutral_index / (input_index_max - 1)
 
         self.model = None
-        self.optimizer = None
-
         self.target = None
+        self.optimizer = None
 
         self.episode_number = 0
 
         self.run_count = 1
         self.epsilon = 1
+        self.reward_paths = []
 
-    # normalize the state attributes between 0, 1 using precalculated min max
-    def normalize_state(self, state):
+    def normalize_state(self, state: dict) -> dict:
+        """
+        normalize the state attributes between 0, 1 using precalculated min max
+        :param state:
+        :return:
+        """
         norm_state = dict()
 
         # normalize game state
@@ -73,8 +89,6 @@ class EvalWorker(mp.Process):
                 if game_state[p_idx][attrib] > minmax[attrib]['max'] or \
                         game_state[p_idx][attrib] < minmax[attrib]['min']:
                     pass
-                    # logging.info("state out of bounds: attrib={}, state={}, minmax={}".format(
-                    #     attrib, game_state[player_idx][attrib], minmax[attrib]))
                 # range = max - min
                 min_max_diff = minmax[attrib]['max'] - minmax[attrib]['min']
 
@@ -84,12 +98,16 @@ class EvalWorker(mp.Process):
 
         # normalize input
         input_index = state['input'][self.player_idx]
-        # print("input_index = {}".format(input_index))
         norm_state['input'] = input_index / (self.input_index_max + 1)
 
         return norm_state
 
     def setup_model(self):
+        """
+        init model, target, optim
+        load existing if exists for run
+        :return:
+        """
         self.model, self.optimizer = model.setup_model(
             frames_per_observation=self.frames_per_evaluation,
             input_lookback=self.input_lookback,
@@ -124,6 +142,9 @@ class EvalWorker(mp.Process):
         self.model = self.model.to(device)
         self.target = self.target.to(device)
 
+        if not config.settings['last_episode_only']:
+            self.reward_paths = eval_util.get_reward_paths(self.player_idx)
+
         self.target.eval()
 
         # warm up model
@@ -132,9 +153,14 @@ class EvalWorker(mp.Process):
                 (self.frames_per_evaluation * (len(self.state_format['attrib']) * 2)) + self.input_lookback).to(device)
             out_tensor = self.model(in_tensor)
 
-        self.use_argmax = (random.random() < config.settings['use_best_action'])
-
     def round_cleanup(self, normalized_states, model_output):
+        """
+        store for this round
+        train and update target net if necessary
+        :param normalized_states:
+        :param model_output:
+        :return:
+        """
         eval_util.store_eval_output(
             normalized_states,
             self.states,
@@ -154,10 +180,13 @@ class EvalWorker(mp.Process):
             self.episode_number += 1
 
     def reward_train(self):
-        reward_path = "data/eval/{}/reward/{}/{}".format(config.settings['run_name'], self.player_idx,
-                                                         self.episode_number)
-        eval_path = "data/eval/{}/evals/{}/{}".format(config.settings['run_name'], self.player_idx, self.episode_number)
-        stats_path = "data/eval/{}/stats/{}".format(config.settings['run_name'], self.player_idx)
+        reward_path = "{}/eval/{}/reward/{}/{}".format(config.settings['data_path'], config.settings['run_name'],
+                                                       self.player_idx,
+                                                       self.episode_number)
+        eval_path = "{}/eval/{}/evals/{}/{}".format(config.settings['data_path'], config.settings['run_name'],
+                                                    self.player_idx, self.episode_number)
+        stats_path = "{}/eval/{}/stats/{}".format(config.settings['data_path'], config.settings['run_name'],
+                                                  self.player_idx)
         reward_paths = calc_reward.generate_rewards(
             reward_path=reward_path,
             eval_path=eval_path,
@@ -168,9 +197,16 @@ class EvalWorker(mp.Process):
             hit_preframes=config.settings['hit_preframes'],
             reward_gamma=config.settings['reward_gamma']
         )
-        if not config.settings['last_episode_only']:
-            reward_paths = eval_util.get_reward_paths(self.player_idx)
-        train_dqn_model.train_model(reward_paths, stats_path, self.model, self.target, self.optimizer,
+        if config.settings['last_episode_only']:
+            reward_sample = [reward_paths]
+        else:
+            self.reward_paths.append(reward_paths)
+            if len(self.reward_paths) > config.settings['episode_sample_size']:
+                reward_sample = random.sample(self.reward_paths, config.settings['episode_sample_size'])
+            else:
+                reward_sample = self.reward_paths
+
+        train_dqn_model.train_model(reward_sample, stats_path, self.model, self.target, self.optimizer,
                                     config.settings['epochs'],
                                     self.episode_number)
 
@@ -185,17 +221,18 @@ class EvalWorker(mp.Process):
             last_normalized_index = 0
             last_evaluated_index = 0
 
-            # RNG
+            # dora please
             final_epsilon = config.settings['final_epsilon']
             initial_epsilon = config.settings['initial_epsilon']
             epsilon_decay = config.settings['epsilon_decay']
 
-            self.eval_status['eval_ready'] = True
+            self.eval_status['eval_ready'] = True  # eval is ready
             while not self.eval_status['kill_eval']:
-                self.eval_status['eval_ready'] = True
+                self.eval_status['eval_ready'] = True  # still ready
+                # while round is live and no kill event
                 while not self.env_status['round_done'] and not self.eval_status['kill_eval']:
-                    did_store = False
-                    if len(self.states) > len(normalized_states):  # if there are game states to normalize
+                    did_store = False  # didn't store for this round yet
+                    if len(self.states) > len(normalized_states):  # if there are frames to normalize
                         # normalize a frame and append to to normalized states
                         normalized_states.append(
                             self.normalize_state(self.states[last_normalized_index])
@@ -220,7 +257,7 @@ class EvalWorker(mp.Process):
                             evaluation_frames = evaluation_frames[-self.frames_per_evaluation:]
 
                             input_len = len(normalized_inputs)
-                            if input_len < self.input_lookback:
+                            if input_len < self.input_lookback:  # if not enough inputs pad with neutral input
                                 input_frames = \
                                     ([self.norm_neut_index] * (self.input_lookback - input_len)) + normalized_inputs
                             else:
@@ -230,7 +267,7 @@ class EvalWorker(mp.Process):
                             flat_frames = []
                             for f_ in evaluation_frames:
                                 flat_frames = flat_frames + f_['game']
-                            flat_frames = input_frames + flat_frames
+                            flat_frames = input_frames + flat_frames  # put input state in front of game state
 
                             if random.random() < eps_threshold:
                                 detached_out = torch.Tensor(np.random.rand(self.input_index_max + 1))
@@ -244,15 +281,7 @@ class EvalWorker(mp.Process):
 
                                 detached_out = out_tensor.detach().cpu()
                             try:
-                                if self.use_argmax:
-                                    action_index = torch.argmax(detached_out).numpy()
-                                else:
-                                    r = torch.softmax(detached_out)
-                                    # r = torch.clone(detached_out)
-                                    # r = r + torch.abs(torch.min(r))
-                                    # r = r / torch.sum(r)
-
-                                    action_index = np.random.choice(r.size(0), 1, p=r.numpy())[0]
+                                action_index = torch.argmax(detached_out).numpy()
                             except RuntimeError as e:
                                 logger.debug("in_tensor={}".format(in_tensor))
                                 logger.debug("detached_out={}".format(action_index))
@@ -276,28 +305,25 @@ class EvalWorker(mp.Process):
                                     last_normalized_index - self.reaction_delay - 1
                                 ],
                                 "epsilon": self.epsilon
-                                # 'input_tensor': flat_frames
                             }
 
                             # increment evaluated index
                             last_evaluated_index = last_evaluated_index + 1
                     else:
                         pass  # no states yet
-                if not did_store and len(normalized_states) > 0:
+                if not did_store and len(normalized_states) > 0:  # if we didn't store yet and there are states to store
                     print("eps_threshold={}".format(self.epsilon))
                     logger.debug("{} eval cleanup".format(self.player_idx))
-                    self.eval_status['eval_ready'] = False
+                    self.eval_status['eval_ready'] = False  # eval is not ready
                     logger.debug("{} stopping eval".format(self.player_idx))
-                    normalized_states = normalized_states[0:last_evaluated_index]
-                    self.round_cleanup(normalized_states, model_output)
+                    normalized_states = normalized_states[0:last_evaluated_index]  # trim states not used
+                    self.round_cleanup(normalized_states, model_output)  # train, store
                     did_store = True
-                    del normalized_states[:]
-                    model_output.clear()
+                    del normalized_states[:]  # clear norm state for round
+                    model_output.clear()  # clear
                     last_normalized_index = 0
                     last_evaluated_index = 0
                     self.run_count = self.run_count + 1
-                    self.use_argmax = (random.random() < config.settings['use_best_action'])
-                    print("p{} use_argmax={}".format(self.player_idx, self.use_argmax))
                     logger.debug("{} finished cleanup".format(self.player_idx))
                     self.eval_status['storing_eval'] = False  # finished storing eval
         except Exception as identifier:

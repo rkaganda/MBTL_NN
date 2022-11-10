@@ -1,7 +1,4 @@
-import copy
-import ctypes.wintypes
 from ctypes import windll
-import os
 import time
 import datetime
 import json
@@ -15,14 +12,14 @@ import sub_tl
 
 import multiprocessing as mp
 from multiprocessing import Process, Manager, Event, Value
-# import torch.multiprocessing as mp
-# from torch.multiprocessing import Process, Manager, Event
+
+
 import logging
 
 import config
 import mbtl_input
 import melty_state
-from nn.EvalWorker import EvalWorker
+from eval.EvalWorker import EvalWorker
 
 state_format = dict()
 state_format['directions'] = config.settings['directions']
@@ -30,20 +27,17 @@ state_format['buttons'] = config.settings['buttons']
 state_format['minmax'] = melty_state.get_minmax()
 state_format['attrib'], attrib_keys = melty_state.get_attributes()
 
-# attrib_keys = list(state_format['game_attrib'])
 
-logging.basicConfig(filename='logs/train.log', level=logging.DEBUG, format='%(asctime)s %(levelname)-8s %(message)s')
+logging.basicConfig(filename='../logs/train.log', level=logging.DEBUG, format='%(asctime)s %(levelname)-8s %(message)s')
 logger = logging.getLogger(__name__)
 
 
-def get_state_data(cfg):
+def get_state_data(cfg: cfg_tl) -> dict:
     character_elements = cfg.characters_data_list[0]
     state_data = dict()
     for character_idx in [0, 1]:
         state_data[character_idx] = dict()
-        # for n_ in dir(character_elements.characters_data[character_idx]):  # for each attribute in character data
         for n_ in attrib_keys:  # for each attribute in character data
-            # if n_ != "bunker_pointer" and n_ != "c_timer":
             cd_attrib = getattr(character_elements.characters_data[character_idx], n_)  # get the attribute
             # if the attribute is memory data
             if isinstance(cd_attrib, mem_access_util.mem_util.Mem_Data_Class):
@@ -119,28 +113,14 @@ def monitor_state(game_states, input_indices, timer_log, env_status, eval_status
     logger.debug("monitor dead")
 
 
-def store_states(states, timer_log):
-    full_store = {}
-    for idx, timestamp in enumerate(timer_log):
-        full_store[str(timestamp)] = {
-            "state": states[str(idx)]['game'],
-            "inputs": states[str(idx)]['input']
-        }
-    match_dir = "data/rounds"  # dir to store matches
-    Path("{}/{}".format(match_dir, config.settings['run_name'])).mkdir(parents=True, exist_ok=True)
-
-    with open("{}/{}.json".format(match_dir, int(datetime.datetime.now().timestamp())), 'a') as f_writer:
-        f_writer.write(json.dumps(full_store))
-
-
-def capture_rounds(round_num):
+def capture_rounds(round_num: int):
     # create data structures
     manager = Manager()
-    game_states_ = manager.list()
-    timer_log_ = manager.list()
-    env_status_ = manager.dict()
-    env_status_['die'] = False
-    env_status_['round_done'] = False
+    game_states_ = manager.list()  # stores game state for each frame
+    timer_log_ = manager.list()  # list of frame numbers
+    env_status_ = manager.dict()  # stores env status
+    env_status_['die'] = False  # kill processes event
+    env_status_['round_done'] = False  # round done event
 
     # params
     frames_per_observation = int(config.settings['frames_per_observation'])
@@ -154,15 +134,17 @@ def capture_rounds(round_num):
     do_inputs_processes = dict()
     input_indices = dict()
 
-    for p in range(0, 1):
-        eval_statuses_[p] = manager.dict()
+    # for each player
+    for p in range(0, 2):
+        eval_statuses_[p] = manager.dict()  # share data across processes
         eval_statuses_[p]['kill_eval'] = False  # eval die
         eval_statuses_[p]['storing_eval'] = False  # eval storing data
         eval_statuses_[p]['eval_ready'] = False  # eval ready generate inputs
 
-        input_list, neutral_index = mbtl_input.create_input_list(p)
-        input_indices[p] = Value('i', neutral_index)
+        input_list, neutral_index = mbtl_input.create_input_list(p)  # action => key mapping
+        input_indices[p] = Value('i', neutral_index)  # current player action/input
 
+        # create worker for evaluation/training/reward
         eval_w = EvalWorker(
             game_states=game_states_,
             env_status=env_status_,
@@ -180,34 +162,36 @@ def capture_rounds(round_num):
         )
         eval_workers[p] = eval_w
 
+        # process to update actions=>keys each frame
         do_input_process = Process(
             target=mbtl_input.do_inputs,
             args=(input_indices[p], input_list, kill_inputs_process, env_status_))
         do_inputs_processes[p] = do_input_process
 
+    # monitor env and update env state every frame
     monitor_mbtl_process = Process(target=monitor_state,
                                    args=(game_states_, input_indices, timer_log_, env_status_, eval_statuses_, timer_max))
 
     print("starting")
     logger.debug("starting")
-    for _, eval_worker in eval_workers.items():
+    for _, eval_worker in eval_workers.items():  # start the eval workers
         eval_worker.start()
     logger.debug("eval started")
-    monitor_mbtl_process.start()
+    monitor_mbtl_process.start()  # start process to monitor game state
     logger.debug("monitored started")
-    for _, inputs_process in do_inputs_processes.items():
+    for _, inputs_process in do_inputs_processes.items():  # start process to do inputs
         inputs_process.start()
     logger.debug("do inputs started")
 
-    for r in range(0, round_num):
+    for r in range(0, round_num):  # for each round
         print("round={}".format(r))
         logger.debug("round={}".format(r))
-        while not env_status_['round_done']:
+        while not env_status_['round_done']:  # while round is running
             time.sleep(.001)
         logger.debug("round done, notifying eval")
-        for _, eval_st in eval_statuses_.items():
-            eval_st['storing_eval'] = True
-        # wait for eval to finish storing
+        for _, eval_st in eval_statuses_.items():  # for each player eval
+            eval_st['storing_eval'] = True  # eval calc reward, store data, train model
+        # wait for eval to finish
         while all([not _v['eval_ready'] for _, _v in eval_statuses_.items()]):
             time.sleep(.001)
         logger.debug("storing eval done")
@@ -220,7 +204,6 @@ def capture_rounds(round_num):
     logger.debug("killing evals")
     for _, eval_st in eval_statuses_.items():
         eval_st['kill_eval'] = True
-    # status_['kill_eval'] = True
     logger.debug("killing env")
     env_status_['die'] = True
     logger.debug("killing inputs processes")
@@ -230,7 +213,6 @@ def capture_rounds(round_num):
     logger.debug("eval worker join")
     for _, eval_w in eval_workers.items():
         eval_w.join()
-    # module_eval_worker.join()
     logger.debug("monitor_mbtl_process join")
     monitor_mbtl_process.join()
     logger.debug("do_p1_inputs_process join")
@@ -242,12 +224,6 @@ def capture_rounds(round_num):
     print("stopped")
 
 
-def collect_data(capture_count):
-    capture_rounds(capture_count)
-
-
 if __name__ == "__main__":
     mp.set_start_method('spawn')
-    collect_data(20)
-
-    # test_no_inputs()
+    capture_rounds(20)
