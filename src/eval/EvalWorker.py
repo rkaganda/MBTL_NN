@@ -195,6 +195,8 @@ class EvalWorker(mp.Process):
             player_idx=self.player_idx,
             reaction_delay=config.settings['reaction_delay'],
             hit_preframes=config.settings['hit_preframes'],
+            atk_preframes=config.settings['atk_preframes'],
+            whiff_reward=config.settings['whiff_reward'],
             reward_gamma=config.settings['reward_gamma']
         )
         if config.settings['last_episode_only']:

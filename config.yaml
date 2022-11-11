@@ -18,6 +18,8 @@ epsilon_decay: 100
 # reward
 hit_preframes: 20
 reward_gamma: .8
+atk_preframes: 8
+whiff_reward: -1000
 reward_columns:
   0:
     "p_0_health": 1

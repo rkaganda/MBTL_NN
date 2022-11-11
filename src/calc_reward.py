@@ -177,9 +177,12 @@ def calculate_reward_from_eval(
         file_path: str,
         reward_columns: dict,
         falloff: int,
-        player_idx, reaction_delay,
-        hit_preframes,
-        reward_gamma
+        player_idx: int,
+        reaction_delay: int,
+        hit_preframes: int,
+        atk_preframes: int,
+        whiff_reward: float,
+        reward_gamma: float
 ) -> pd.DataFrame:
     """
     Generate a json reward file from an eval json file
@@ -190,6 +193,8 @@ def calculate_reward_from_eval(
     :param player_idx: the idx of the player that the reward is being generated for [0,1]
     :param reaction_delay: the reaction delay, not used
     :param hit_preframes: how many input frames to before the hit to apply the reward to
+    :param atk_preframes: how many input frames before atk starts to apply whiff reward
+    :param whiff_reward: negative whiff reward
     :param reward_gamma: reward gama
     :return: dataframe containing just state, action and reward
     """
@@ -208,6 +213,9 @@ def calculate_reward_from_eval(
 
     # apply rewards for hitting and getting hit
     eval_state_df = apply_hit_segment_rewards(player_idx, eval_state_df, hit_preframes)
+
+    # apply whiff rewards
+    eval_state_df = apply_whiff_reward(player_idx, eval_state_df, atk_preframes, whiff_reward)
 
     # apply reward discounts
     eval_state_df = apply_reward_discount(eval_state_df, reward_gamma)
@@ -235,7 +243,7 @@ def apply_reward_discount(df: pd.DataFrame, gamma: float) -> pd.DataFrame:
     return df
 
 
-def apply_hit_segment_rewards(p_idx: int, df, hit_preframes: int) -> pd.DataFrame:
+def apply_hit_segment_rewards(p_idx: int, df: pd.DataFrame, hit_preframes: int) -> pd.DataFrame:
     """
     generates reward for each frame starting from n (hit_preframes) before the enemy was hit to the last hitframe
     the amount of reward applied each frame is the sum differences in health each frame from the start to end of hit stun
@@ -266,6 +274,37 @@ def apply_hit_segment_rewards(p_idx: int, df, hit_preframes: int) -> pd.DataFram
         for idxs, val in health_lost_segs.items():  # for each hit segment
             # apply reward to frames from hit start - hit_preframes to hit end
             df.loc[(df.index <= idxs[1]) & (df.index > idxs[0] - hit_preframes), 'reward'] = val
+
+    return df
+
+
+def apply_whiff_reward(p_idx: int, df: pd.DataFrame, atk_preframes: int, whiff_reward: float):
+    """
+    generates negative reward for each frame starting from player atk - atk_preframes to player atk start
+    if enemy player is not hit during the player atk frames
+    :param p_idx: player to apply whiff reward to
+    :param df: the game state, each row is a frame
+    :param atk_preframes:
+    :param whiff_reward:
+    :return: the state dataframe with reward calculated for each frame/row
+    """
+    atk_col = 'p_{}_atk'.format(p_idx)
+    enemy_hit_col = 'p_{}_hit'.format(1 - p_idx)
+
+    # calculate atk changes
+    v = (df[atk_col] != df[atk_col].shift()).cumsum()
+    u = df.groupby(v)[atk_col].agg(['all', 'count'])
+    m = u['all'] & u['count'].ge(1)
+
+    # create atk segments
+    atk_segements = df.groupby(v).apply(lambda x: (x.index[0], x.index[-1]))[m]
+
+    # find whiffs
+    for hs in atk_segements:
+        if df[hs[0]:hs[1]][enemy_hit_col].sum() < 1:  # if atk whiffed
+            df.loc[(df.index <= hs[0]) & (df.index > hs[0] - atk_preframes), 'reward'] = \
+                df.loc[(df.index <= hs[0]) & (
+                            df.index > hs[0] - atk_preframes), 'reward'] + whiff_reward  # apply whiff reward
 
     return df
 
@@ -322,7 +361,7 @@ def generate_json_from_in_out_df(output_with_input_and_reward: pd.DataFrame):
 
 
 def generate_rewards(eval_path: str, reward_path: str, reward_columns: dict, falloff: int, player_idx: int,
-                     reaction_delay: int, hit_preframes: int,
+                     reaction_delay: int, hit_preframes: int, atk_preframes: int, whiff_reward: float,
                      reward_gamma: int) -> str:
     """
     loads all the eval files contained in the eval path and generates a reward file for each
@@ -333,6 +372,8 @@ def generate_rewards(eval_path: str, reward_path: str, reward_columns: dict, fal
     :param player_idx:
     :param reaction_delay:
     :param hit_preframes:
+    :param atk_preframes:
+    :param whiff_reward:
     :param reward_gamma:
     :return: path to new reward file
     """
@@ -345,8 +386,15 @@ def generate_rewards(eval_path: str, reward_path: str, reward_columns: dict, fal
             if file.startswith('eval_'):
                 reward_file = file.replace('eval_', 'reward_')
                 file_name = "{}/{}".format(eval_path, file)
-                df = calculate_reward_from_eval(file_name, reward_columns, falloff, player_idx, reaction_delay,
-                                                hit_preframes, reward_gamma)
+                df = calculate_reward_from_eval(
+                    file_path=file_name,
+                    reward_columns=reward_columns,
+                    falloff=falloff, player_idx=player_idx,
+                    reaction_delay=reaction_delay,
+                    hit_preframes=hit_preframes,
+                    atk_preframes=atk_preframes,
+                    whiff_reward=whiff_reward,
+                    reward_gamma=reward_gamma)
                 file_json = generate_json_from_in_out_df(df)
 
                 with open("{}/{}".format(reward_path, reward_file), 'w') as f_writer:
