@@ -1,4 +1,4 @@
-run_name: "normalized input_reduced action space"
+run_name: "roa vs shiki"
 
 data_path: "../data"
 minmax_file: "reduced_minmax.json"

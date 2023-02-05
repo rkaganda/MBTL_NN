@@ -80,6 +80,7 @@ def monitor_state(game_states, input_indices, timer_log, env_status, eval_status
                         round_reset = True
                         mbtl_input.reset_round()
                         time.sleep(.001)  # wait for round to reset
+                    timer_old = cfg.game_data.timer.r_mem()
                 else:
                     pass
                 # タイマーチェック # timer check
@@ -118,7 +119,7 @@ def capture_rounds(round_num: int):
     timer_log_ = manager.list()  # list of frame numbers
     env_status_ = manager.dict()  # stores env status
     env_status_['die'] = False  # kill processes event
-    env_status_['round_done'] = True  # round done event
+    env_status_['round_done'] = False  # round done event
 
     # params
     frames_per_observation = int(config.settings['frames_per_observation'])

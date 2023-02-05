@@ -85,7 +85,7 @@ class EvalWorker(mp.Process):
 
         # normalize game state
         minmax = self.state_format['minmax']
-        game_state = melty_state.encode_relative_states(state['game'], self.player_idx)
+        game_state, player_facing_flag = melty_state.encode_relative_states(copy.deepcopy(state['game']), self.player_idx)
         norm_state['game'] = list()
         for p_idx in [0, 1]:  # for each player state
             for attrib in self.state_format['attrib']:  # for each attribute
@@ -104,7 +104,7 @@ class EvalWorker(mp.Process):
         input_index = state['input'][self.player_idx]
         norm_state['input'] = input_index / (self.input_index_max + 1)
 
-        return norm_state, {'game': game_state, 'input': state['input']}
+        return norm_state, {'game': game_state, 'input': state['input']}, player_facing_flag
 
     def setup_model(self):
         """
@@ -240,7 +240,8 @@ class EvalWorker(mp.Process):
                     did_store = False  # didn't store for this round yet
                     if len(self.states) > len(normalized_states):  # if there are frames to normalize
                         # normalize a frame and append to to normalized states
-                        normalized_state, relative_state = self.normalize_state(copy.deepcopy(self.states[last_normalized_index]))
+                        normalized_state, relative_state, player_facing_flag = \
+                            self.normalize_state(self.states[last_normalized_index])
                         self.states[last_normalized_index] = relative_state
                         normalized_states.append(
                             normalized_state
@@ -290,6 +291,7 @@ class EvalWorker(mp.Process):
                                 detached_out = out_tensor.detach().cpu()
                             try:
                                 action_index = torch.argmax(detached_out).numpy()
+                                action_index = 40
                             except RuntimeError as e:
                                 logger.debug("in_tensor={}".format(in_tensor))
                                 logger.debug("detached_out={}".format(action_index))
@@ -297,7 +299,7 @@ class EvalWorker(mp.Process):
                                 raise e
 
                             self.input_index.value = action_index
-                            self.player_facing_flag.value = relative_state['game'][self.player_idx]['player_facing_flag']
+                            self.player_facing_flag.value = player_facing_flag
 
                             # store model output
                             normalized_states[last_evaluated_index]['input'] = input_frames
