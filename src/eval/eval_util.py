@@ -8,7 +8,7 @@ from os import listdir
 from os.path import isfile, join
 
 
-def store_eval_output(normalized_states: list, states: dict, model_output: list, state_format: dict, player_idx: int,
+def store_eval_output(normalized_states: list, states: list, model_output: list, state_format: dict, player_idx: int,
                       episode_number: int):
     """
     store the eval output for entire round

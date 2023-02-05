@@ -2,6 +2,7 @@ import logging
 import traceback
 import math
 import random
+import copy
 
 import multiprocessing as mp
 import numpy as np
@@ -26,8 +27,8 @@ torch.set_default_dtype(torch.float64)
 class EvalWorker(mp.Process):
     def __init__(self, game_states: list, frames_per_evaluation: int, reaction_delay: int, env_status: dict,
                  eval_status: dict,
-                 input_index: int, input_index_max: int, state_format: dict,
-                 learning_rate: float, player_idx: int, frame_list: list, neutral_index: int, input_lookback: int):
+                 input_index: int, input_index_max: int, state_format: dict, player_facing_flag: int,
+                 learning_rate: float, player_idx: int, frame_list: list, neutral_action_index: int, input_lookback: int):
         """
 
         :param game_states: list of game states for the current round index by frame
@@ -41,11 +42,13 @@ class EvalWorker(mp.Process):
         :param learning_rate: learning rate of the model
         :param player_idx: index of player for this eval
         :param frame_list: list of frame numbers
-        :param neutral_index: index for neutral action (no buttons pressed)
+        :param neutral_action_index: index for neutral action (no buttons pressed)
         :param input_lookback: how many input frames add to model input
+        :param input_lookback: the flag for what direction the player is facing
         """
         super(EvalWorker, self).__init__()
         self.states = game_states
+        self.updated_states = [[], []]
         self.frames_per_evaluation = frames_per_evaluation
         self.reaction_delay = reaction_delay
         self.env_status = env_status
@@ -56,10 +59,11 @@ class EvalWorker(mp.Process):
         self.player_idx = player_idx
         self.frame_list = frame_list
         self.input_lookback = input_lookback
+        self.player_facing_flag = player_facing_flag
 
         self.state_format = state_format
-        self.neutral_index = neutral_index
-        self.norm_neut_index = neutral_index / (input_index_max - 1)
+        self.neutral_action_index = neutral_action_index
+        self.norm_neut_index = neutral_action_index / (input_index_max - 1)
 
         self.model = None
         self.target = None
@@ -71,7 +75,7 @@ class EvalWorker(mp.Process):
         self.epsilon = 1
         self.reward_paths = []
 
-    def normalize_state(self, state: dict) -> dict:
+    def normalize_state(self, state: dict) -> (dict, dict):
         """
         normalize the state attributes between 0, 1 using precalculated min max
         :param state:
@@ -81,7 +85,7 @@ class EvalWorker(mp.Process):
 
         # normalize game state
         minmax = self.state_format['minmax']
-        game_state = melty_state.calc_extra_states(state['game'])
+        game_state = melty_state.encode_relative_states(state['game'], self.player_idx)
         norm_state['game'] = list()
         for p_idx in [0, 1]:  # for each player state
             for attrib in self.state_format['attrib']:  # for each attribute
@@ -100,7 +104,7 @@ class EvalWorker(mp.Process):
         input_index = state['input'][self.player_idx]
         norm_state['input'] = input_index / (self.input_index_max + 1)
 
-        return norm_state
+        return norm_state, {'game': game_state, 'input': state['input']}
 
     def setup_model(self):
         """
@@ -236,8 +240,10 @@ class EvalWorker(mp.Process):
                     did_store = False  # didn't store for this round yet
                     if len(self.states) > len(normalized_states):  # if there are frames to normalize
                         # normalize a frame and append to to normalized states
+                        normalized_state, relative_state = self.normalize_state(copy.deepcopy(self.states[last_normalized_index]))
+                        self.states[last_normalized_index] = relative_state
                         normalized_states.append(
-                            self.normalize_state(self.states[last_normalized_index])
+                            normalized_state
                         )
                         normalized_inputs.append(normalized_states[-1]['input'])
                         last_normalized_index = last_normalized_index + 1
@@ -250,7 +256,7 @@ class EvalWorker(mp.Process):
                             esp_count = self.run_count
 
                             eps_threshold = final_epsilon + (initial_epsilon - final_epsilon) * \
-                                            math.exp(-1. * esp_count / epsilon_decay)
+                                math.exp(-1. * esp_count / epsilon_decay)
 
                             self.epsilon = eps_threshold
 
@@ -291,6 +297,7 @@ class EvalWorker(mp.Process):
                                 raise e
 
                             self.input_index.value = action_index
+                            self.player_facing_flag.value = relative_state['game'][self.player_idx]['player_facing_flag']
 
                             # store model output
                             normalized_states[last_evaluated_index]['input'] = input_frames

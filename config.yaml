@@ -1,4 +1,4 @@
-run_name: "input_lookback_test"
+run_name: "normalized input_reduced action space"
 
 data_path: "../data"
 minmax_file: "reduced_minmax.json"
@@ -30,7 +30,7 @@ reward_columns:
 reward_falloff: 25
 
 # training
-episode_sample_size: 10
+episode_sample_size: 1
 learning_rate: 1e-5
 last_episode_only: False
 batch_size: 512
@@ -39,35 +39,21 @@ tau: 100
 
 # inputs
 directions:
-  - "1"
-  - "2"
-  - "3"
-  - "4"
-  - "5"
-  - "6"
-  - "7"
-  - "8"
-  - "9"
+  - ["1","3"]
+  - ["2","2"]
+  - ["3","1"]
+  - ["4","6"]
+  - ["5","5"]
+  - ["6","4"]
+  - ["7","9"]
+  - ["8","8"]
+  - ["9","7"]
 
 buttons:
   - "a"
   - "b"
   - "c"
   - "d"
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 timer_max: 9999999
 

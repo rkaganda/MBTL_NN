@@ -310,14 +310,14 @@ def apply_whiff_reward(p_idx: int, df: pd.DataFrame, atk_preframes: int, whiff_r
 
 
 def apply_invalid_input_reward(e_df: pd.DataFrame, player_idx: int, reaction_delay: int,
-                               neutral_index: int) -> pd.DataFrame:
+                               neutral_action_index: int) -> pd.DataFrame:
     """
     reward function that applied a negative reward if action had no effect on state (no motion type change)
     test results - negative pred q resulted in no actions even if positive reward was possible with different action
     :param e_df:
     :param player_idx:
     :param reaction_delay:
-    :param neutral_index:
+    :param neutral_action_index:
     :return:
     """
     invalid_frame_window = 5
@@ -329,7 +329,7 @@ def apply_invalid_input_reward(e_df: pd.DataFrame, player_idx: int, reaction_del
     change_index = e_df[e_df[motion_change_col] != 0].index.tolist()
 
     valid_input_index = [v - 1 for v in change_index]
-    neutral_inputs = e_df[e_df['input'] == neutral_index].index.tolist()
+    neutral_inputs = e_df[e_df['input'] == neutral_action_index].index.tolist()
 
     valid_windows = set(
         itertools.chain.from_iterable([list(range(v - invalid_frame_window, v)) for v in valid_input_index])).union(
