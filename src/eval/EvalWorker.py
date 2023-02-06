@@ -61,6 +61,7 @@ class EvalWorker(mp.Process):
         self.input_lookback = input_lookback
         self.player_facing_flag = player_facing_flag
 
+        self.relative_states = []
         self.state_format = state_format
         self.neutral_action_index = neutral_action_index
         self.norm_neut_index = neutral_action_index / (input_index_max - 1)
@@ -89,6 +90,9 @@ class EvalWorker(mp.Process):
         norm_state['game'] = list()
         for p_idx in [0, 1]:  # for each player state
             for attrib in self.state_format['attrib']:  # for each attribute
+                if attrib not in game_state[p_idx]:
+                    print("failed attrib={}".format(attrib))
+                    print(game_state[p_idx])
                 # if value is outside min max
                 if game_state[p_idx][attrib] > minmax[attrib]['max'] or \
                         game_state[p_idx][attrib] < minmax[attrib]['min']:
@@ -142,7 +146,6 @@ class EvalWorker(mp.Process):
 
             model.save_model(self.model, self.optimizer, self.player_idx, episode_num=-1)
 
-        print(self.model)
         self.target.load_state_dict(self.model.state_dict())
         self.model = self.model.to(device)
         self.target = self.target.to(device)
@@ -168,7 +171,7 @@ class EvalWorker(mp.Process):
         """
         eval_util.store_eval_output(
             normalized_states,
-            self.states,
+            self.relative_states,
             model_output,
             self.state_format,
             self.player_idx,
@@ -243,7 +246,11 @@ class EvalWorker(mp.Process):
                         # normalize a frame and append to to normalized states
                         normalized_state, relative_state, player_facing_flag = \
                             self.normalize_state(self.states[last_normalized_index])
-                        self.states[last_normalized_index] = relative_state
+
+                        if last_normalized_index != len(self.relative_states):
+                            raise IndexError
+                        self.relative_states.append(relative_state)
+
                         normalized_states.append(
                             normalized_state
                         )
@@ -292,6 +299,7 @@ class EvalWorker(mp.Process):
                                 detached_out = out_tensor.detach().cpu()
                             try:
                                 action_index = torch.argmax(detached_out).numpy()
+                                action_index = self.neutral_action_index
                             except RuntimeError as e:
                                 logger.debug("in_tensor={}".format(in_tensor))
                                 logger.debug("detached_out={}".format(action_index))

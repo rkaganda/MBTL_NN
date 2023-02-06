@@ -228,4 +228,4 @@ def capture_rounds(round_num: int):
 
 if __name__ == "__main__":
     mp.set_start_method('spawn')
-    capture_rounds(20)
+    capture_rounds(1)
