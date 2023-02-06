@@ -49,8 +49,8 @@ def encode_relative_states(game_state, player_idx):
         game_state[1 - player_idx]['x_posi'] = state_format['minmax']['x_posi']['max'] + x_distance_from_left
 
     if player_idx == 1:
-        rel_state = {0: game_state[1], 1: game_state[1]}
+        rel_state = {0: game_state[0], 1: game_state[1]}
     else:
-        rel_state = {1: game_state[0], 0: game_state[0]}
+        rel_state = {1: game_state[1], 0: game_state[0]}
 
     return rel_state, player_facing_flag
