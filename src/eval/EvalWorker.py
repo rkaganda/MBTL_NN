@@ -330,7 +330,7 @@ class EvalWorker(mp.Process):
                             last_evaluated_index = last_evaluated_index + 1
                     else:
                         pass  # no states yet
-                if not did_store and len(normalized_states) > 0:  # if we didn't store yet and there are states to store
+                if not did_store and len(model_output) > 0:  # if we didn't store yet and there are states to store
                     print("eps_threshold={}".format(self.epsilon))
                     logger.debug("{} eval cleanup".format(self.player_idx))
                     self.eval_status['eval_ready'] = False  # eval is not ready
