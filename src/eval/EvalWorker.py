@@ -299,7 +299,6 @@ class EvalWorker(mp.Process):
                                 detached_out = out_tensor.detach().cpu()
                             try:
                                 action_index = torch.argmax(detached_out).numpy()
-                                action_index = self.neutral_action_index
                             except RuntimeError as e:
                                 logger.debug("in_tensor={}".format(in_tensor))
                                 logger.debug("detached_out={}".format(action_index))
@@ -338,6 +337,7 @@ class EvalWorker(mp.Process):
                     normalized_states = normalized_states[0:last_evaluated_index]  # trim states not used
                     self.round_cleanup(normalized_states, model_output)  # train, store
                     did_store = True
+                    del self.relative_states[:]  # clear norm state for round
                     del normalized_states[:]  # clear norm state for round
                     model_output.clear()  # clear
                     last_normalized_index = 0
