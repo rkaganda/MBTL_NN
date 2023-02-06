@@ -114,8 +114,7 @@ def calculate_reformed_input_df(eval_df: pd.DataFrame, norm_state_df: pd.DataFra
     return reformed_input_df
 
 
-def create_eval_state_df(eval_df: pd.DataFrame, actual_state_df: pd.DataFrame,
-                         reformed_input_df: pd.DataFrame) -> pd.DataFrame:
+def create_eval_state_df(eval_df: pd.DataFrame, actual_state_df: pd.DataFrame) -> pd.DataFrame:
     """
     merge all the dataframes together so that a single row contains
     the multiple frames of normalized state evaluated that frame
@@ -123,7 +122,6 @@ def create_eval_state_df(eval_df: pd.DataFrame, actual_state_df: pd.DataFrame,
     the output/action of the model for that frame
     :param eval_df:
     :param actual_state_df:
-    :param reformed_input_df:
     :return:
     """
     eval_state_df = eval_df.merge(
@@ -131,12 +129,6 @@ def create_eval_state_df(eval_df: pd.DataFrame, actual_state_df: pd.DataFrame,
         how='left',
         left_on='window_0',
         right_index=True
-    )
-
-    eval_state_df = eval_state_df.merge(
-        reformed_input_df,
-        right_index=True,
-        left_index=True
     )
 
     return eval_state_df
@@ -202,20 +194,19 @@ def calculate_reward_from_eval(
     eval_df = create_eval_df(file_dict)  # contains the eval each frame as a row
     norm_state_df = create_norm_state_df(file_dict)  # contains normalize state for each frame
     actual_state_df = calculate_actual_state_df(file_dict)  # contains actual state for each frame
-    reformed_input_df = calculate_reformed_input_df(eval_df, norm_state_df)  # contains frame information and norm state
 
     eval_state_df = create_eval_state_df(  # actual state, norm state, eval info
-        eval_df, actual_state_df, reformed_input_df)
+        eval_df, actual_state_df)
 
     eval_state_df = generate_diff(eval_state_df, reward_columns)  # generate diff columns to calc reward
 
     eval_state_df['reward'] = 0  # set reward each frame to 0
 
     # apply rewards for hitting and getting hit
-    eval_state_df = apply_hit_segment_rewards(player_idx, eval_state_df, hit_preframes)
+    eval_state_df = apply_hit_segment_rewards(eval_state_df, hit_preframes)
 
     # apply whiff rewards
-    eval_state_df = apply_whiff_reward(player_idx, eval_state_df, atk_preframes, whiff_reward)
+    eval_state_df = apply_whiff_reward(eval_state_df, atk_preframes, whiff_reward)
 
     # apply reward discounts
     eval_state_df = apply_reward_discount(eval_state_df, reward_gamma)
@@ -243,12 +234,11 @@ def apply_reward_discount(df: pd.DataFrame, gamma: float) -> pd.DataFrame:
     return df
 
 
-def apply_hit_segment_rewards(p_idx: int, df: pd.DataFrame, hit_preframes: int) -> pd.DataFrame:
+def apply_hit_segment_rewards(df: pd.DataFrame, hit_preframes: int) -> pd.DataFrame:
     """
     generates reward for each frame starting from n (hit_preframes) before the enemy was hit to the last hitframe
     the amount of reward applied each frame is the sum differences in health each frame from the start to end of hit stun
     if the player is hit the reward is negative, if hitting reward is positive
-    :param p_idx: the id of the player receiving the rewards
     :param df: the game state, each row is a frame
     :param hit_preframes:
     :return: the state dataframe with reward calculated for each frame/row
@@ -278,7 +268,7 @@ def apply_hit_segment_rewards(p_idx: int, df: pd.DataFrame, hit_preframes: int) 
     return df
 
 
-def apply_whiff_reward(p_idx: int, df: pd.DataFrame, atk_preframes: int, whiff_reward: float):
+def apply_whiff_reward(df: pd.DataFrame, atk_preframes: int, whiff_reward: float):
     """
     generates negative reward for each frame starting from player atk - atk_preframes to player atk start
     if enemy player is not hit during the player atk frames
@@ -288,6 +278,8 @@ def apply_whiff_reward(p_idx: int, df: pd.DataFrame, atk_preframes: int, whiff_r
     :param whiff_reward:
     :return: the state dataframe with reward calculated for each frame/row
     """
+
+    p_idx = 0
     atk_col = 'p_{}_atk'.format(p_idx)
     enemy_hit_col = 'p_{}_hit'.format(1 - p_idx)
 
@@ -309,17 +301,17 @@ def apply_whiff_reward(p_idx: int, df: pd.DataFrame, atk_preframes: int, whiff_r
     return df
 
 
-def apply_invalid_input_reward(e_df: pd.DataFrame, player_idx: int, reaction_delay: int,
+def apply_invalid_input_reward(e_df: pd.DataFrame, reaction_delay: int,
                                neutral_action_index: int) -> pd.DataFrame:
     """
     reward function that applied a negative reward if action had no effect on state (no motion type change)
     test results - negative pred q resulted in no actions even if positive reward was possible with different action
     :param e_df:
-    :param player_idx:
     :param reaction_delay:
     :param neutral_action_index:
     :return:
     """
+    player_idx = 0
     invalid_frame_window = 5
     motion_change_col = 'p_{}_motion_change'.format(player_idx)
     motion_type_col = 'p_{}_motion_type'.format(player_idx)
@@ -402,6 +394,8 @@ def generate_rewards(eval_path: str, reward_path: str, reward_columns: dict, fal
 
         except Exception as e:
             logger.debug("file_name={}/{}".format(eval_path, file))
+            logger.error(e)
+            raise e
 
     return reward_path
 

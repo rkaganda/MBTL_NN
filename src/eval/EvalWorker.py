@@ -142,6 +142,7 @@ class EvalWorker(mp.Process):
 
             model.save_model(self.model, self.optimizer, self.player_idx, episode_num=-1)
 
+        print(self.model)
         self.target.load_state_dict(self.model.state_dict())
         self.model = self.model.to(device)
         self.target = self.target.to(device)
@@ -291,7 +292,6 @@ class EvalWorker(mp.Process):
                                 detached_out = out_tensor.detach().cpu()
                             try:
                                 action_index = torch.argmax(detached_out).numpy()
-                                action_index = 40
                             except RuntimeError as e:
                                 logger.debug("in_tensor={}".format(in_tensor))
                                 logger.debug("detached_out={}".format(action_index))
@@ -306,7 +306,7 @@ class EvalWorker(mp.Process):
                             model_output[last_evaluated_index] = {
                                 'output': list(detached_out.numpy()),
                                 'frame': self.frame_list[-1],
-                                # 'state': flat_frames,
+                                'state': flat_frames,
                                 'states': len(self.states),
                                 'norm_states': len(normalized_states),
                                 'last_evaluated_index': last_evaluated_index,
