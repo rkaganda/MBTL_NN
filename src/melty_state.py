@@ -10,6 +10,8 @@ with open("{}/{}".format(config.settings['data_path'], config.settings['minmax_f
 
 def get_minmax():
     minmax = state_format['minmax']
+
+    # create state the stores opponents relative position
     minmax['x_spac'] = dict()
     minmax['x_spac']['max'] = abs(state_format['minmax']['x_posi']['max'] - state_format['minmax']['x_posi']['min'])
     minmax['x_spac']['min'] = 0
@@ -28,9 +30,27 @@ def get_attributes():
     return state_format['attrib'], state_format['game_attrib']
 
 
-def calc_extra_states(game_state):
-    for p_idx in [0, 1]:
-        game_state[p_idx]['x_spac'] = abs(game_state[p_idx]['x_posi'] - game_state[1-p_idx]['x_posi'])
-        game_state[p_idx]['y_spac'] = abs(game_state[p_idx]['y_posi'] - game_state[1-p_idx]['y_posi'])
+def encode_relative_states(game_state, player_idx):
+    player_facing_flag = 1
 
-    return game_state
+    if game_state[player_idx]['x_posi'] < game_state[1 - player_idx]['x_posi']:
+        player_facing_flag = 0
+
+    for p_idx in [0, 1]:
+        # encode opponents position relative to player
+        game_state[p_idx]['x_spac'] = abs(game_state[p_idx]['x_posi'] - game_state[1 - p_idx]['x_posi'])
+        game_state[p_idx]['y_spac'] = abs(game_state[p_idx]['y_posi'] - game_state[1 - p_idx]['y_posi'])
+
+    if player_facing_flag == 1:
+        x_distance_from_right = state_format['minmax']['x_posi']['max'] - game_state[player_idx]['x_posi']
+        game_state[player_idx]['x_posi'] = state_format['minmax']['x_posi']['min'] + x_distance_from_right
+
+        x_distance_from_left = state_format['minmax']['x_posi']['min'] - game_state[1 - player_idx]['x_posi']
+        game_state[1 - player_idx]['x_posi'] = state_format['minmax']['x_posi']['max'] + x_distance_from_left
+
+    if player_idx == 1:
+        rel_state = {0: game_state[0], 1: game_state[1]}
+    else:
+        rel_state = {1: game_state[1], 0: game_state[0]}
+
+    return rel_state, player_facing_flag

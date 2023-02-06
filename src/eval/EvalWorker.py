@@ -2,6 +2,7 @@ import logging
 import traceback
 import math
 import random
+import copy
 
 import multiprocessing as mp
 import numpy as np
@@ -26,8 +27,8 @@ torch.set_default_dtype(torch.float64)
 class EvalWorker(mp.Process):
     def __init__(self, game_states: list, frames_per_evaluation: int, reaction_delay: int, env_status: dict,
                  eval_status: dict,
-                 input_index: int, input_index_max: int, state_format: dict,
-                 learning_rate: float, player_idx: int, frame_list: list, neutral_index: int, input_lookback: int):
+                 input_index: int, input_index_max: int, state_format: dict, player_facing_flag: int,
+                 learning_rate: float, player_idx: int, frame_list: list, neutral_action_index: int, input_lookback: int):
         """
 
         :param game_states: list of game states for the current round index by frame
@@ -41,11 +42,13 @@ class EvalWorker(mp.Process):
         :param learning_rate: learning rate of the model
         :param player_idx: index of player for this eval
         :param frame_list: list of frame numbers
-        :param neutral_index: index for neutral action (no buttons pressed)
+        :param neutral_action_index: index for neutral action (no buttons pressed)
         :param input_lookback: how many input frames add to model input
+        :param input_lookback: the flag for what direction the player is facing
         """
         super(EvalWorker, self).__init__()
         self.states = game_states
+        self.updated_states = [[], []]
         self.frames_per_evaluation = frames_per_evaluation
         self.reaction_delay = reaction_delay
         self.env_status = env_status
@@ -56,10 +59,12 @@ class EvalWorker(mp.Process):
         self.player_idx = player_idx
         self.frame_list = frame_list
         self.input_lookback = input_lookback
+        self.player_facing_flag = player_facing_flag
 
+        self.relative_states = []
         self.state_format = state_format
-        self.neutral_index = neutral_index
-        self.norm_neut_index = neutral_index / (input_index_max - 1)
+        self.neutral_action_index = neutral_action_index
+        self.norm_neut_index = neutral_action_index / (input_index_max - 1)
 
         self.model = None
         self.target = None
@@ -71,7 +76,7 @@ class EvalWorker(mp.Process):
         self.epsilon = 1
         self.reward_paths = []
 
-    def normalize_state(self, state: dict) -> dict:
+    def normalize_state(self, state: dict) -> (dict, dict):
         """
         normalize the state attributes between 0, 1 using precalculated min max
         :param state:
@@ -81,10 +86,13 @@ class EvalWorker(mp.Process):
 
         # normalize game state
         minmax = self.state_format['minmax']
-        game_state = melty_state.calc_extra_states(state['game'])
+        game_state, player_facing_flag = melty_state.encode_relative_states(copy.deepcopy(state['game']), self.player_idx)
         norm_state['game'] = list()
         for p_idx in [0, 1]:  # for each player state
             for attrib in self.state_format['attrib']:  # for each attribute
+                if attrib not in game_state[p_idx]:
+                    print("failed attrib={}".format(attrib))
+                    print(game_state[p_idx])
                 # if value is outside min max
                 if game_state[p_idx][attrib] > minmax[attrib]['max'] or \
                         game_state[p_idx][attrib] < minmax[attrib]['min']:
@@ -100,7 +108,7 @@ class EvalWorker(mp.Process):
         input_index = state['input'][self.player_idx]
         norm_state['input'] = input_index / (self.input_index_max + 1)
 
-        return norm_state
+        return norm_state, {'game': game_state, 'input': state['input']}, player_facing_flag
 
     def setup_model(self):
         """
@@ -163,7 +171,7 @@ class EvalWorker(mp.Process):
         """
         eval_util.store_eval_output(
             normalized_states,
-            self.states,
+            self.relative_states,
             model_output,
             self.state_format,
             self.player_idx,
@@ -195,6 +203,8 @@ class EvalWorker(mp.Process):
             player_idx=self.player_idx,
             reaction_delay=config.settings['reaction_delay'],
             hit_preframes=config.settings['hit_preframes'],
+            atk_preframes=config.settings['atk_preframes'],
+            whiff_reward=config.settings['whiff_reward'],
             reward_gamma=config.settings['reward_gamma']
         )
         if config.settings['last_episode_only']:
@@ -234,8 +244,15 @@ class EvalWorker(mp.Process):
                     did_store = False  # didn't store for this round yet
                     if len(self.states) > len(normalized_states):  # if there are frames to normalize
                         # normalize a frame and append to to normalized states
-                        normalized_states.append(
+                        normalized_state, relative_state, player_facing_flag = \
                             self.normalize_state(self.states[last_normalized_index])
+
+                        if last_normalized_index != len(self.relative_states):
+                            raise IndexError
+                        self.relative_states.append(relative_state)
+
+                        normalized_states.append(
+                            normalized_state
                         )
                         normalized_inputs.append(normalized_states[-1]['input'])
                         last_normalized_index = last_normalized_index + 1
@@ -248,7 +265,7 @@ class EvalWorker(mp.Process):
                             esp_count = self.run_count
 
                             eps_threshold = final_epsilon + (initial_epsilon - final_epsilon) * \
-                                            math.exp(-1. * esp_count / epsilon_decay)
+                                math.exp(-1. * esp_count / epsilon_decay)
 
                             self.epsilon = eps_threshold
 
@@ -289,13 +306,14 @@ class EvalWorker(mp.Process):
                                 raise e
 
                             self.input_index.value = action_index
+                            self.player_facing_flag.value = player_facing_flag
 
                             # store model output
                             normalized_states[last_evaluated_index]['input'] = input_frames
                             model_output[last_evaluated_index] = {
                                 'output': list(detached_out.numpy()),
                                 'frame': self.frame_list[-1],
-                                # 'state': flat_frames,
+                                'state': flat_frames,
                                 'states': len(self.states),
                                 'norm_states': len(normalized_states),
                                 'last_evaluated_index': last_evaluated_index,
@@ -311,7 +329,7 @@ class EvalWorker(mp.Process):
                             last_evaluated_index = last_evaluated_index + 1
                     else:
                         pass  # no states yet
-                if not did_store and len(normalized_states) > 0:  # if we didn't store yet and there are states to store
+                if not did_store and len(model_output) > 0:  # if we didn't store yet and there are states to store
                     print("eps_threshold={}".format(self.epsilon))
                     logger.debug("{} eval cleanup".format(self.player_idx))
                     self.eval_status['eval_ready'] = False  # eval is not ready
@@ -319,6 +337,7 @@ class EvalWorker(mp.Process):
                     normalized_states = normalized_states[0:last_evaluated_index]  # trim states not used
                     self.round_cleanup(normalized_states, model_output)  # train, store
                     did_store = True
+                    del self.relative_states[:]  # clear norm state for round
                     del normalized_states[:]  # clear norm state for round
                     model_output.clear()  # clear
                     last_normalized_index = 0

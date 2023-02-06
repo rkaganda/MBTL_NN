@@ -73,7 +73,6 @@ def monitor_state(game_states, input_indices, timer_log, env_status, eval_status
         if tr_flag == 100 or tr_flag == 300:  # if in verses mode or training mode
             sub.function_key(data_index)
             time.sleep(.001)
-
             while all([_v['eval_ready'] for _, _v in eval_statuses.items()]):
                 if not round_reset:
                     reset_timer = cfg.game_data.timer.r_mem()
@@ -133,6 +132,7 @@ def capture_rounds(round_num: int):
     kill_inputs_process = Event()
     do_inputs_processes = dict()
     input_indices = dict()
+    player_facing_flag = dict()
 
     # for each player
     for p in range(0, 2):
@@ -141,8 +141,9 @@ def capture_rounds(round_num: int):
         eval_statuses_[p]['storing_eval'] = False  # eval storing data
         eval_statuses_[p]['eval_ready'] = False  # eval ready generate inputs
 
-        input_list, neutral_index = mbtl_input.create_input_list(p)  # action => key mapping
-        input_indices[p] = Value('i', neutral_index)  # current player action/input
+        action_list, neutral_action_index, facing_flag = mbtl_input.create_action_list(p)  # action => key mapping
+        input_indices[p] = Value('i', neutral_action_index)  # current player action/input
+        player_facing_flag[p] = Value('i', facing_flag)  # current player action/input
 
         # create worker for evaluation/training/reward
         eval_w = EvalWorker(
@@ -152,20 +153,21 @@ def capture_rounds(round_num: int):
             frames_per_evaluation=frames_per_observation,
             reaction_delay=reaction_delay,
             input_index=input_indices[p],
-            input_index_max=len(input_list)-1,
+            input_index_max=len(action_list[p])-1,
             state_format=state_format,
             learning_rate=learning_rate,
             player_idx=p,
             frame_list=timer_log_,
-            neutral_index=neutral_index,
-            input_lookback=config.settings['input_lookback']
+            neutral_action_index=neutral_action_index,
+            input_lookback=config.settings['input_lookback'],
+            player_facing_flag=player_facing_flag[p]
         )
         eval_workers[p] = eval_w
 
         # process to update actions=>keys each frame
         do_input_process = Process(
             target=mbtl_input.do_inputs,
-            args=(input_indices[p], input_list, kill_inputs_process, env_status_))
+            args=(input_indices[p], action_list, kill_inputs_process, env_status_, player_facing_flag[p]))
         do_inputs_processes[p] = do_input_process
 
     # monitor env and update env state every frame
@@ -226,4 +228,4 @@ def capture_rounds(round_num: int):
 
 if __name__ == "__main__":
     mp.set_start_method('spawn')
-    capture_rounds(20)
+    capture_rounds(1)

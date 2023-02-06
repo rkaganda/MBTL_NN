@@ -1,3 +1,8 @@
+#
+# https://github.com/kosunan/MBTL_Training
+#
+
+
 import os
 import time
 import ctypes
@@ -5,7 +10,6 @@ import copy
 import keyboard
 from struct import unpack, pack
 
-# from Fighting_Game_Indicator import indicator
 
 from mem_access_util import mem_util
 
@@ -48,8 +52,15 @@ def tagCharacterCheck(index):
     d1 = cfg.characters_data_list[index].characters_data
     e1 = cfg.characters_data_list[index].characters_elements
 
-    p1, p2, p3, p4 = d1
-    e_p1, e_p2, e_p3, e_p4 = e1
+    p1 = d1[0]
+    p2 = d1[1]
+    p3 = d1[2]
+    p4 = d1[3]
+
+    e_p1 = e1[0]
+    e_p2 = e1[1]
+    e_p3 = e1[2]
+    e_p4 = e1[3]
 
     if p1.tag_flag.val == 1:
         cfg.characters_data_list[index].characters_data = [p3, p2, p1, p4]
@@ -99,29 +110,19 @@ def situationWrit():
 def action_element_cre(n1, n2):
     jmp_number = [34, 35, 36, 37]
     jmp2_number = [39, 38, 40]
-
-    # noguard_number = [95,105,76]
-    noguard_number = [77]
-    n1.noguard_flag = 0
-    for list_a in noguard_number:
-        if n1.noguard.val == list_a:
-            n1.noguard_flag = 1
-            break
-
     # action_element作成
     n1.action_element.val = 0
 
-
-    if n1.noguard_flag == 1:
+    if n1.noguard.val == 77:
         n1.action_element.val = 0
 
-    if n1.noguard_flag == 0 and n1.motion_type.val != 0:
+    if n1.noguard.val == 0 and n1.motion_type.val != 0:
         n1.action_element.val = 1
 
-    if n1.noguard_flag == 1 and n1.motion_chenge_flag == 0 and n1.ignore_flag == 0:  # ジャンプ後即行動対策
+    if n1.noguard.val == 77 and n1.motion_chenge_flag == 0 and n1.ignore_flag == 0:  # ジャンプ後即行動対策
         n1.action_element.val = 1
 
-    if n1.noguard_flag == 1 and n1.motion_type.val == 21:
+    if n1.noguard.val == 77 and n1.motion_type.val == 21:
         n1.action_element.val = 0
 
     for list_a in jmp2_number:
@@ -135,17 +136,6 @@ def action_element_cre(n1, n2):
 
     if n1.ignore_flag == 1:
         n1.action_element.val = 0
-
-def freeze_frame_cre(p1,p2):
-
-    if p1.freeze_frame.val == 16 or p1.freeze_frame.val == 80:  # 暗転しているとき
-        cfg.freeze_frame += 1
-
-    elif abs(p2.freeze_frame.val) == 128:  # 暗転しているとき
-        cfg.freeze_frame += 1
-
-    else:
-        cfg.freeze_frame = 0
 
 
 def old_index_get(index, max_index):
@@ -162,7 +152,7 @@ def content_creation(current_index):
     tagCharacterCheck(current_index)
     check_data_list = cfg.characters_data_list
 
-    ignore_number = [0, 10, 11, 12, 13, 14, 15, 16, 18, 19, 20, 44,  596]
+    ignore_number = [0, 10, 11, 12, 13, 14, 15, 16, 18, 19, 20, 44, 594, 596]
     stun_number = [620, 621, 624]
     jmp_number = [34, 35, 36, 37]
     jmp2_number = [39, 38, 40]
@@ -186,8 +176,15 @@ def content_creation(current_index):
     p1_old2 = d3[0]
     p2_old2 = d3[1]
 
-    # freeze_frame作成
-    freeze_frame_cre(p1,p2)
+    # anten作成
+    if p1.anten_stop.val == 16:  # 暗転しているとき
+        cfg.anten += 1
+
+    elif abs(p2.anten_stop.val) == 128:  # 暗転しているとき
+        cfg.anten += 1
+
+    else:
+        cfg.anten = 0
 
     for n1, n2, n3 in zip(d1, d2, d3):
         n1.overall = n2.overall
@@ -289,7 +286,7 @@ def content_creation(current_index):
             n1.atk_element.val = 1
 
         # 攻撃判定持続計算
-        if n1.atk_element.val == 1 and cfg.freeze_frame == 0 and cfg.hitstop == 0 and n1.c_timer.val != n2.c_timer.val:  # 攻撃判定を出しているとき
+        if n1.atk_element.val == 1 and cfg.anten == 0 and cfg.hitstop == 0 and n1.c_timer.val != n2.c_timer.val:  # 攻撃判定を出しているとき
             if n1.hitstop_element.val == 0:
                 n1.active += 1
 
@@ -361,7 +358,7 @@ def content_creation(current_index):
         # wake_up_element作成
         n1.wake_up_element.val = 0
 
-        if n1.motion_type.val == 593 or n1.motion_type.val == 594:
+        if n1.motion_type.val == 593:
             n1.wake_up_element.val = 1
             n1.wake_up_element.num = 0
         # air_element作成
@@ -424,9 +421,9 @@ def content_creation(current_index):
             n1.line_5_element.num = n1.noguard.val
             n1.line_6_element.num = n1.action_element.val
             n1.line_7_element.num = n1.c_timer.val
-            n1.line_8_element.num = cfg.freeze_frame
+            n1.line_8_element.num = n1.bunker.val
             n1.line_9_element.num = n1.stop_flag
-            n1.line_10_element.num = cfg.stop_flag
+            n1.line_10_element.num = n1.hitstop.val
 
     if d1[0].stop_flag == 1 and d1[1].stop_flag == 1:
         if cfg.stop_view_flag == 0:
@@ -434,7 +431,7 @@ def content_creation(current_index):
         else:
             cfg.stop_flag = 0
 
-    elif cfg.freeze_frame >= 1:
+    elif cfg.anten >= 1:
         cfg.stop_flag += 1
     else:
         cfg.stop_flag = 0
@@ -448,16 +445,12 @@ def content_creation(current_index):
     # 硬直差の取得
     advantage_calc(p1, p2)
 
-    if p1_old.air_element.val == 1 and p1.air_element.val == 0 and cfg.advantage_f > 0:
-        cfg.advantage_f = 1
-
     if cfg.advantage_calc_flag == 1:
         p1.adv_element.val = 1
         p1.adv_element.num = abs(cfg.advantage_f)
 
         p2.adv_element.val = 1
         p2.adv_element.num = abs(cfg.advantage_f)
-
     elif cfg.advantage_calc_flag == 0:
         p1.adv_element.val = 0
         p1.adv_element.num = 0
@@ -521,25 +514,25 @@ def template_view():
     if cfg.template_view_flag == 0:
         cfg.template_view_flag = 1
 
-        end = '\x1b[0m'
+        fini = '\x1b[0m'
 
         #                                        10        20        30        40        50        60        70        80        90       100
-        #                               123456789112345678921234567893123456789412345678951234567896123456789712345678981234567899123456789012345678991
+        #                               123456789112345678921234567893123456789412345678951234567896123456789712345678981234567899123456789912345678991
         state_str += cursor_move(1, 3) + '|firstAct|adv|proration|  untec|  range|position -000000|circuit 000.00%|moon 000.00%|speed x 0000|y 0000|health 00000|'
         state_str += cursor_move(2, 3) + '|      00|-00|     000%|000,000| 000000|         -000000|        000.00%|     000.00%|        0000|  0000|       00000|'
 
         state_str += cursor_move(1, 122)
-        state_str += 'motion ' + cfg.G_mot + '01' + end
-        state_str += '  atk ' + cfg.G_atk + '01' + end
-        state_str += '  stun ' + cfg.G_grd_stun + '01' + end
-        state_str += '  jmp ' + cfg.G_jmp + '01' + end
-        state_str += ' air ' + '01' + end
+        state_str += 'motion ' + cfg.G_mot + '01' + fini
+        state_str += '  atk ' + cfg.G_atk + '01' + fini
+        state_str += '  stun ' + cfg.G_grd_stun + '01' + fini
+        state_str += '  jmp ' + cfg.G_jmp + '01' + fini
+        state_str += ' air ' + '01' + fini
 
         state_str += cursor_move(2, 122)
-        state_str += ' seeld ' + cfg.G_seeld + '01' + end
-        state_str += '  inv ' + cfg.G_inv + '01' + end
-        state_str += '  stop ' + cfg.G_hit_stop + '01' + end
-        state_str += ' armor' + cfg.G_armor + '01' + end
+        state_str += ' seeld ' + cfg.G_seeld + '01' + fini
+        state_str += '  inv ' + cfg.G_inv + '01' + fini
+        state_str += '  stop ' + cfg.G_hit_stop + '01' + fini
+        state_str += ' armor' + cfg.G_armor + '01' + fini
 
         state_str += '      ^'
 
@@ -657,31 +650,31 @@ def function_key(data_index):
     #         moon_change()
 
     # 簡易表示切り替え
-    # elif keyboard.is_pressed("F3"):
-    #     if cfg.on_flag == 0:
-    #         cfg.on_flag = 1
-    #         cfg.debug_flag = 0
-    #         if cfg.light_mode_flag == 0:
-    #             cfg.light_mode_flag = 1
-    #             os.system('cls')
-    #             os.system('mode con: cols=164 lines=5')
-    #
-    #         elif cfg.light_mode_flag == 1:
-    #             cfg.light_mode_flag = 0
-    #             os.system('cls')
-    #             os.system('mode con: cols=164 lines=7')
-
-    # 位置入れ替え
     elif keyboard.is_pressed("F3"):
         if cfg.on_flag == 0:
             cfg.on_flag = 1
-            reversal()
+            cfg.debug_flag = 0
+            if cfg.light_mode_flag == 0:
+                cfg.light_mode_flag = 1
+                os.system('cls')
+                os.system('mode con: cols=164 lines=5')
+
+            elif cfg.light_mode_flag == 1:
+                cfg.light_mode_flag = 0
+                os.system('cls')
+                os.system('mode con: cols=164 lines=7')
 
     # 最大ダメージ初期化
     elif keyboard.is_pressed("F4"):
         if cfg.on_flag == 0:
             cfg.on_flag = 1
             max_damage_ini()
+
+    # 位置入れ替え
+    elif keyboard.is_pressed("1"):
+        if cfg.on_flag == 0:
+            cfg.on_flag = 1
+            reversal()
 
     # デバッグ表示
     elif (keyboard.is_pressed("9")) and (keyboard.is_pressed("0")):

@@ -1,3 +1,8 @@
+#
+# https://github.com/kosunan/MBTL_Training
+#
+
+
 from mem_access_util import mem_util
 import time
 
@@ -9,7 +14,7 @@ save_flag = 0
 game_data = 0
 
 characters_data_list = []
-freeze_frame = 0
+anten = 0
 hitstop = 0
 stop_flag = 0
 stop_view_flag = 0
@@ -41,25 +46,22 @@ class Characters_Data_Class:
 class Game_Data_Class:
     def __init__(self):
         self.cont_list = list = []
-
-        self.timer = pack(list, 0x6617DC, 4)
-        # self.timer_2 = pack(list, 0x62ACB8, 4)
-        self.tr_flag = pack(list, 0x8717F4, 4)
-        self.damage = pack(list, 0x8A7030, 4)
+        self.timer = pack(list, 0x5E5CF4, 4)
+        self.timer_2 = pack(list, 0x5E5CF4, 4)
+        self.tr_flag = pack(list, 0x82B248, 4)
+        self.damage = pack(list, 0x8609A0, 4)
         self.hosei = pack(list, self.damage.ad - 12, 4)
         self.ukemi = pack(list, self.damage.ad - 4, 2)  # 受け身不能時間補正
-        self.cam = pack(list, 0x8A7920, 1500)
-        self.cam_1 = pack(list, self.cam.ad + 0xF8, 4)
-
-        self.start_posi = pack(list, 0x8C62F4, 1)
-        self.max_damage_pointer = pack(list, 0x8C679C, 4)
-        self.pause = pack(list, 0x8BFDB8, 1)
-
+        self.cam = pack(list, 0x861390, 1500)
+        self.cam_1 = pack(list, self.cam.ad + 0xc8, 4)
+        self.start_posi = pack(list, 0x87CED4, 1)
+        self.max_damage_pointer = pack(list, 0x87FE1C, 4)
+        self.pause = pack(list, 0x8797F8, 1)
 
 class Character_Data_Class:
     def __init__(self, p_num):
-        PLR_STRUCT_SIZE = 0xC34  #
-        DAT_P1_AD = 0xCED570      # 1Pデータ開始位置
+        PLR_STRUCT_SIZE = 0xC3C  #
+        DAT_P1_AD = 0xCA6120     # 1Pデータ開始位置
 
         size = DAT_P1_AD + (PLR_STRUCT_SIZE * p_num)
         self.cont_list = list = []
@@ -70,13 +72,12 @@ class Character_Data_Class:
         self.inv = pack(list, 0x61 + size, 1)
         self.x_posi = pack(list, 0x64 + size, 4)
         self.y_posi = pack(list, self.x_posi.ad + 4, 4)
+        # self.y_posi = pack(list, self.x_posi.ad + 4 + size, 4)
         self.x_speed = pack(list, 0x1E0 + size, 4)
         self.y_speed = pack(list, 0x1E4 + size, 4)
         self.health = pack(list, 0x8C + size, 4)
         self.air = pack(list, 0x6B + size, 2)
         self.gauge = pack(list, 0xA0 + size, 4)
-        # self.gauge = pack(list, 0x120 + size, 4)
-
         self.hitstop = pack(list, 0x298 + size, 1)
         self.seeld = pack(list, 0x2A0 + size, 1)
         self.tag_flag = pack(list, 0x2A4 + size, 1)
@@ -89,33 +90,37 @@ class Character_Data_Class:
         self.heat_inv = pack(list, 0x5E4 + size, 1)
         self.armor_1 = pack(list, 0x614 + size, 1)
         self.armor_2 = pack(list, 0xC0 + size, 1)
-        self.moon = pack(list, 0x948 + size, 4)
-        self.moon_st = pack(list, 0x94A + size, 1)
-        self.noguard2 = pack(list, 0xBA4 + size, 1)
-        self.noguard = pack(list, 0xB9C + size, 1)
+
+        self.anten_stop2 = pack(list, 0x6f0 + size, 4)
+        self.moon = pack(list, 0x950 + size, 4)
+        self.moon_st = pack(list, 0x94C + size, 1)
+        self.noguard = pack(list, 0xBA4 + size, 1)
         self.bunker = pack(list, 0x6E4 + size, 1)
         self.bunker_pointer = pack(list, 0x6EC + size, 4)
 
-        freeze_frame = 0xCEE8FA
         if p_num == 0 or p_num == 2:
-            self.freeze_frame = pack(list, freeze_frame, 1)
+            self.anten_stop = pack(list, 0xCA74B2, 1)
 
         elif p_num == 1 or p_num == 3:
-            self.freeze_frame = pack(list, freeze_frame + 3, 1)
+            self.anten_stop = pack(list, 0xCA74B5, 1)
 
         # 処理用変数
         self.elements = list = []
         self.adv_element = element_cre(list, 0, G_adv)
+
         self.action_element = element_cre(list, 0, G_mot)
         self.koutyoku_element = element_cre(list, 0, G_mot2)
+
         self.inv_element = element_cre(list, 0, G_inv)
         self.grd_stun_element = element_cre(list, 0, G_grd_stun)
+
         self.hit_stun_element = element_cre(list, 0, G_hit_stun)
         self.jmp_element = element_cre(list, 0, G_jmp)
         self.seeld_element = element_cre(list, 0, G_seeld)
         self.bunker_element = element_cre(list, 0, G_bunker)
         self.armor_element = element_cre(list, 0, G_armor)
         self.hitstop_element = element_cre(list, 0, G_hit_stop)
+
         self.wake_up_element = element_cre(list, 0, G_wake_up)
 
         self.air_element = element_cre(list, 1, G_air)
@@ -133,8 +138,6 @@ class Character_Data_Class:
         self.line_10_element = element_cre(list, 9, G_adv)
 
         self.ignore_flag = 0
-        self.noguard_flag = 0
-
         self.motion_chenge_flag = 0
         self.act_flag = 0
         self.first_active = 0
@@ -187,6 +190,8 @@ def get_font(text_rgb, bg_rgb):
 
 G_atk = get_font((255, 255, 255), (240, 0, 0))
 G_mot = get_font((255, 255, 255), (65, 200, 0))
+# G_mot2 = get_font((35, 158, 0), (34, 40, 49))
+
 G_mot2 = get_font((255, 255, 255), (35, 158, 0))
 G_mot3 = get_font((255, 255, 255), (123, 184, 193))
 

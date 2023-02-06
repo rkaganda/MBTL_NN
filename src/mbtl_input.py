@@ -111,15 +111,15 @@ mapping_dicts = dict()
 
 mapping_dicts[0] = dict()
 mapping_dicts[0]['directions'] = dict()
-mapping_dicts[0]['directions']['1'] = [0x53, 0x41]  # P1 1 = 4+2
+mapping_dicts[0]['directions']['1'] = [0x41, 0x53]  # P1 1 = 4+2
 mapping_dicts[0]['directions']['2'] = [0x53]  # P1 2 # s
-mapping_dicts[0]['directions']['3'] = [0x53, 0x57]  # P1 3 = 2+6
+mapping_dicts[0]['directions']['3'] = [0x53, 0x44]  # P1 3 = 2+6
 mapping_dicts[0]['directions']['4'] = [0x41]  # P1 4 # a
 mapping_dicts[0]['directions']['5'] = []  # P1 5
-mapping_dicts[0]['directions']['6'] = [0x57]  # P1 6 # w
-mapping_dicts[0]['directions']['7'] = [0x57, 0x44]  # P1 7 = 4 + 8
-mapping_dicts[0]['directions']['8'] = [0x44]  # P1 8 # d
-mapping_dicts[0]['directions']['9'] = [0x44, 0x57]  # P1 8 # d
+mapping_dicts[0]['directions']['6'] = [0x44]  # P1 6 # w
+mapping_dicts[0]['directions']['7'] = [0x41, 0x57]  # P1 7 = 4 + 8
+mapping_dicts[0]['directions']['8'] = [0x57]  # P1 8 # d
+mapping_dicts[0]['directions']['9'] = [0x44, 0x57]  # P1 9 = 8 + 6
 
 # buttons
 mapping_dicts[0]['buttons'] = dict()
@@ -127,7 +127,7 @@ mapping_dicts[0]['buttons']['a'] = [0x49]  # P1 A # i
 mapping_dicts[0]['buttons']['b'] = [0x55]  # P1 B # u
 mapping_dicts[0]['buttons']['c'] = [0x4F]  # P1 C # o
 mapping_dicts[0]['buttons']['d'] = [0x4A]  # P1 D # j
-
+mapping_dicts[0]['buttons']['N'] = []  # neutral
 all_keys = [0x53, 0x41, 0x57, 0x44, 0x49, 0x55, 0x4F, 0x4A]
 
 # P2
@@ -135,15 +135,15 @@ mapping_dicts[1] = dict()
 
 # directions
 mapping_dicts[1]['directions'] = dict()
-mapping_dicts[1]['directions']['1'] = [0x58, 0x56]  # P2 2 4
+mapping_dicts[1]['directions']['1'] = [0x58, 0x43]  # P2 2 4
 mapping_dicts[1]['directions']['2'] = [0x58]  # P2 2 # x #
-mapping_dicts[1]['directions']['3'] = [0x58, 0x43]  # P2 2 6
-mapping_dicts[1]['directions']['4'] = [0x56]  # P2 4 # c
+mapping_dicts[1]['directions']['3'] = [0x58, 0x5A]  # P2 2 6
+mapping_dicts[1]['directions']['4'] = [0x43]  # P2 4 # c
 mapping_dicts[1]['directions']['5'] = []  # P2 4 # c
-mapping_dicts[1]['directions']['6'] = [0x43]  # P2 6 # z
-mapping_dicts[1]['directions']['7'] = [0x56, 0x5A]  # P2 4 8
-mapping_dicts[1]['directions']['8'] = [0x5A]  # P2 8 # v
-mapping_dicts[1]['directions']['9'] = [0x43, 0x5A]  # P2 6 8
+mapping_dicts[1]['directions']['6'] = [0x5A]  # P2 6 # z
+mapping_dicts[1]['directions']['7'] = [0x43, 0x56]  # P2 4 8
+mapping_dicts[1]['directions']['8'] = [0x56]  # P2 8 # v
+mapping_dicts[1]['directions']['9'] = [0x5A, 0x56]  # P2 6 8
 
 # buttons
 mapping_dicts[1]['buttons'] = dict()
@@ -151,30 +151,37 @@ mapping_dicts[1]['buttons']['a'] = [0x42]  # P2 A # b
 mapping_dicts[1]['buttons']['b'] = [0x4E]  # P2 B # n
 mapping_dicts[1]['buttons']['c'] = [0x4D]  # P2 C # m
 mapping_dicts[1]['buttons']['d'] = [0xBC]  # P2 D # ,
+mapping_dicts[0]['buttons']['N'] = []  # neutral
 
 
-def create_input_list(player_index: int) -> Tuple[list, int]:
+def create_action_list(player_index: int) -> Tuple[list, int, int]:
     """
     generates list where index each is an action and the item is a list of keycodes for that action
     :param player_index:
-    :return: list of keycodes, the index for the neutral/empty action
+    :return: list of keycodes, the index for the neutral/empty action, the flag for player facing
     """
-    directions = []  # stores all possible key combinations
+    directions = [[], []]  # stores all possible key combinations
     for idx, direction in enumerate(config.settings['directions']):  # populate list with each key combination
-        directions.append(mapping_dicts[player_index]['directions'][direction])
+        for jdx, side_direction in enumerate(direction):
+            directions[jdx].append(mapping_dicts[player_index]['directions'][side_direction])
 
-    directions_lists = []  # list for each possible direction
-    for r in range(0, len(directions)):
+    directions_lists = [[], []]  # list for each possible direction
+    for r in range(0, len(directions[0])):
         ar = [0] * 9
         ar[r] = 1
-        directions_lists.append(ar)
+        directions_lists[0].append(ar)
+        directions_lists[1].append(ar)
 
-    for d_list in directions_lists:  # populate direction list with key combinations
-        for idx, value in enumerate(directions):
-            if d_list[idx] == 1:
-                d_list[idx] = value
-            else:
-                d_list[idx] = []
+    d_list = [[],[]]
+
+    # populate direction list with key combinations
+    for side, side_d_list in enumerate(directions_lists):  # for each side
+        for idx, dir_list in enumerate(side_d_list):  # for each direction
+            for dir_idx, dir_flag in enumerate(dir_list):
+                if dir_flag == 1:
+                    d_list[side].append(directions[side][dir_idx])
+                else:
+                    pass
 
     # create button combinations list
     buttons_list = []
@@ -192,42 +199,43 @@ def create_input_list(player_index: int) -> Tuple[list, int]:
         [1, 0, 0, 1]  # ac
     ]
 
-    for c_list in combinations:
-        for idx, value in enumerate(buttons_list):
-            if c_list[idx] == 1:
-                c_list[idx] = value
-            else:
-                c_list[idx] = []
+    c_list = []
 
-    all_combinations = []
+    for idx, comb in enumerate(combinations):
+        c_list.append([])
+        for jdx, value in enumerate(buttons_list):
+            if comb[jdx] == 1:
+                c_list[idx].append(value[0])
+                
+    all_combinations = [[], []]
 
-    for d in directions_lists:
-        for c in combinations:
-            all_combinations.append(d + c)
+    for side, dir_list in enumerate(d_list):
+        for d in dir_list:
+            for c in c_list:
+                all_combinations[side].append(d + c)
 
-    combined = []
-    neutral_index = None
-    for idx, ar in enumerate(all_combinations):  # create list with all direction + button combinations
-        new_ar = []
-        for val_ar in ar:
-            new_ar = new_ar + val_ar
-        combined.append(new_ar)
-        if len(new_ar) == 0:
-            neutral_index = idx
+    neutral_action_index = None
+    for _, p_side in enumerate(all_combinations): # create list with all direction + button combinations
+        for idx, ar in enumerate(p_side):
+            if len(ar) == 0:
+                neutral_action_index = idx
 
-    if neutral_index is None:
-        neutral_index = 0
+    if neutral_action_index is None:
+        neutral_action_index = 0
 
-    return combined, neutral_index
+    player_facing_flag = 1-player_index
+
+    return all_combinations, neutral_action_index, player_facing_flag
 
 
-def do_inputs(input_index, input_list: list, die, env_status):
+def do_inputs(input_index, action_list: list, die, env_status, player_facing_flag):
     """
     keeps tracks and processes inputs each frame
     :param input_index: the inputs for the current frame
-    :param input_list:  list of keys corresponding to each input/action
+    :param action_list:  list of keys corresponding to each input/action
     :param die: returns when die is set
     :param env_status:
+    :param player_facing_flag:
     :return:
     """
     inputs_held = set()  # keys being held
@@ -238,7 +246,7 @@ def do_inputs(input_index, input_list: list, die, env_status):
         if not env_status['round_done']:  # if round is live
             time.sleep(.013)  # sleep a frame
             inputs_hold.clear()  # clear held inputs buffer
-            for k in input_list[input_index.value]:  # for each key
+            for k in action_list[player_facing_flag.value][input_index.value]:  # for each key
                 if k not in inputs_held:  # if key is not already being held
                     PressKey(k)  # press key
                 inputs_hold.add(k)  # add key to hold
