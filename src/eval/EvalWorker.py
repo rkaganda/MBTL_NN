@@ -235,6 +235,9 @@ class EvalWorker(mp.Process):
             final_epsilon = config.settings['final_epsilon']
             initial_epsilon = config.settings['initial_epsilon']
             epsilon_decay = config.settings['epsilon_decay']
+            explore_count = 0
+            explore_min = config.settings['no_explore_min']
+            no_explore_count = config.settings['no_explore_count']
 
             self.eval_status['eval_ready'] = True  # eval is ready
             while not self.eval_status['kill_eval']:
@@ -263,11 +266,15 @@ class EvalWorker(mp.Process):
 
                             # exploration calculation
                             esp_count = self.run_count
+                            if explore_count >= no_explore_count:
+                                esp_count = 0
 
                             eps_threshold = final_epsilon + (initial_epsilon - final_epsilon) * \
                                 math.exp(-1. * esp_count / epsilon_decay)
 
                             self.epsilon = eps_threshold
+                            if eps_threshold <= explore_min:
+                                explore_count = explore_count + 1
 
                             # create slice for evaluation
                             evaluation_frames = normalized_states[:-self.reaction_delay]

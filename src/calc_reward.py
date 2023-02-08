@@ -211,6 +211,9 @@ def calculate_reward_from_eval(
     # apply reward discounts
     eval_state_df = apply_reward_discount(eval_state_df, reward_gamma)
 
+    # remove rewards during hit state
+    eval_state_df = remove_rewards_during_hit(eval_state_df)
+
     # trim full df down to just state, action, reward
     output_with_input_and_reward = trim_reward_df(eval_state_df, 'reward_total_norm')
 
@@ -264,6 +267,20 @@ def apply_hit_segment_rewards(df: pd.DataFrame, hit_preframes: int) -> pd.DataFr
         for idxs, val in health_lost_segs.items():  # for each hit segment
             # apply reward to frames from hit start - hit_preframes to hit end
             df.loc[(df.index <= idxs[1]) & (df.index > idxs[0] - hit_preframes), 'reward'] = val
+
+    return df
+
+
+def remove_rewards_during_hit(df: pd.DataFrame):
+    """
+        removes reward data when player is being hit as meaningful actions can be preformed during this time
+        if enemy player is not hit during the player atk frames
+        :param df: the game state, each row is a frame
+        """
+    p_idx = 0
+    hit_col = 'p_{}_hit'.format(p_idx)
+
+    df = df[df[hit_col] == 0]
 
     return df
 
