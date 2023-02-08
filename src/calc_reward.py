@@ -386,7 +386,7 @@ def generate_rewards(eval_path: str, reward_path: str, reward_columns: dict, fal
     :param reward_gamma:
     :return: path to new reward file
     """
-    print(reward_path)
+
     Path("{}".format(reward_path)).mkdir(parents=True, exist_ok=True)
     onlyfiles = [f for f in listdir(eval_path) if isfile(join(eval_path, f))]
 

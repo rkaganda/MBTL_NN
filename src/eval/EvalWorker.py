@@ -182,7 +182,6 @@ class EvalWorker(mp.Process):
             self.target.load_state_dict(self.model.state_dict())
 
         if config.settings['save_model'] and (self.run_count % config.settings['count_save']) == 0:
-            print("epoch cleanup...")
             self.reward_train()
             model.save_model(self.model, self.optimizer, self.player_idx, episode_num=self.episode_number)
             self.episode_number += 1
@@ -268,6 +267,7 @@ class EvalWorker(mp.Process):
                             esp_count = self.run_count
                             if explore_count >= no_explore_count:
                                 esp_count = 0
+                                explore_count = 0
 
                             eps_threshold = final_epsilon + (initial_epsilon - final_epsilon) * \
                                 math.exp(-1. * esp_count / epsilon_decay)

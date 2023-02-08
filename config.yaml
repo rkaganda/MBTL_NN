@@ -36,8 +36,8 @@ episode_sample_size: 1
 learning_rate: 1e-5
 last_episode_only: False
 batch_size: 512
-epochs: 1
-tau: 100
+epochs: 2
+tau: 50
 
 # inputs
 directions:

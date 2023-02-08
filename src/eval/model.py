@@ -107,7 +107,6 @@ def save_model(model, optim, player_idx, episode_num):
     Path(path).mkdir(parents=True, exist_ok=True)
 
     time_str = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-    print("saving model {}".format(time_str))
 
     torch.save(model.state_dict(), "{}/{}.model".format(path, time_str))
     torch.save(optim.state_dict(), "{}/{}.optim".format(path, time_str))
