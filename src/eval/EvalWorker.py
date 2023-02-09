@@ -340,7 +340,7 @@ class EvalWorker(mp.Process):
                         esp_count = esp_count + 1
 
                     self.epsilon = round(eps_threshold, 2)
-                    print("eps={} no_explore=".format(self.epsilon, no_explore_count))
+                    print("eps={} no_explore={}".format(self.epsilon, no_explore_count))
 
                     logger.debug("{} eval cleanup".format(self.player_idx))
                     self.eval_status['eval_ready'] = False  # eval is not ready

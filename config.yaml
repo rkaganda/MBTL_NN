@@ -1,4 +1,4 @@
-run_name: "roa vs shiki"
+run_name: "count_v_shiki"
 
 data_path: "../data"
 minmax_file: "reduced_minmax.json"
