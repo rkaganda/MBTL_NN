@@ -61,6 +61,8 @@ class EvalWorker(mp.Process):
         self.input_lookback = input_lookback
         self.player_facing_flag = player_facing_flag
 
+        # dora please
+
         self.relative_states = []
         self.state_format = state_format
         self.neutral_action_index = neutral_action_index
@@ -197,7 +199,7 @@ class EvalWorker(mp.Process):
         reward_paths = calc_reward.generate_rewards(
             reward_path=reward_path,
             eval_path=eval_path,
-            reward_columns=config.settings['reward_columns'][self.player_idx],
+            reward_columns=config.settings['reward_columns'][0],
             falloff=config.settings['reward_falloff'],
             player_idx=self.player_idx,
             reaction_delay=config.settings['reaction_delay'],
@@ -234,9 +236,9 @@ class EvalWorker(mp.Process):
             final_epsilon = config.settings['final_epsilon']
             initial_epsilon = config.settings['initial_epsilon']
             epsilon_decay = config.settings['epsilon_decay']
-            explore_count = 0
-            explore_min = config.settings['no_explore_min']
-            no_explore_count = config.settings['no_explore_count']
+            eps_threshold = initial_epsilon
+            esp_count = 0
+            no_explore_count = 0
 
             self.eval_status['eval_ready'] = True  # eval is ready
             while not self.eval_status['kill_eval']:
@@ -262,19 +264,6 @@ class EvalWorker(mp.Process):
                         # if reaction time has passed, and we have enough frames to eval
                         if ((last_normalized_index - self.reaction_delay) >= last_evaluated_index) and (
                                 (len(normalized_states) - self.reaction_delay) >= self.frames_per_evaluation):
-
-                            # exploration calculation
-                            esp_count = self.run_count
-                            if explore_count >= no_explore_count:
-                                esp_count = 0
-                                explore_count = 0
-
-                            eps_threshold = final_epsilon + (initial_epsilon - final_epsilon) * \
-                                math.exp(-1. * esp_count / epsilon_decay)
-
-                            self.epsilon = eps_threshold
-                            if eps_threshold <= explore_min:
-                                explore_count = explore_count + 1
 
                             # create slice for evaluation
                             evaluation_frames = normalized_states[:-self.reaction_delay]
@@ -337,7 +326,22 @@ class EvalWorker(mp.Process):
                     else:
                         pass  # no states yet
                 if not did_store and len(model_output) > 0:  # if we didn't store yet and there are states to store
-                    print("eps_threshold={}".format(self.epsilon))
+                    # dora
+                    eps_threshold = final_epsilon + (initial_epsilon - final_epsilon) * \
+                                    math.exp(-1. * esp_count / epsilon_decay)
+
+                    if eps_threshold <= config.settings['eps_explore_threshold']:
+                        no_explore_count = no_explore_count + 1
+
+                    if no_explore_count >= config.settings['no_explore_limit']:
+                        esp_count = 0
+                        no_explore_count = 0
+                    else:
+                        esp_count = esp_count + 1
+
+                    self.epsilon = round(eps_threshold, 2)
+                    print("eps={} no_explore=".format(self.epsilon, no_explore_count))
+
                     logger.debug("{} eval cleanup".format(self.player_idx))
                     self.eval_status['eval_ready'] = False  # eval is not ready
                     logger.debug("{} stopping eval".format(self.player_idx))

@@ -13,8 +13,8 @@ input_lookback: 6
 final_epsilon:  0
 initial_epsilon: 1
 epsilon_decay: 100
-no_explore_count: 10
-no_explore_min: .05
+no_explore_limit: 10
+eps_explore_threshold: .05
 
 
 # reward
