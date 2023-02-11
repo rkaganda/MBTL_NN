@@ -1,3 +1,5 @@
+import os.path
+
 import torch
 import torch.nn as nn
 from torch.nn import functional as F
@@ -9,6 +11,7 @@ from pathlib import Path
 import numpy as np
 from os import listdir
 from os.path import isfile, join
+import json
 
 
 # class Model(eval.Module):
@@ -69,25 +72,61 @@ def setup_model(frames_per_observation, input_lookback, input_state_size, state_
     return model, optimizer
 
 
-def load_model(model, optimizer, player_idx, episode_number, device):
-    for ep_num in reversed(range(-1, episode_number - 1)):
-        path = "{}/eval/{}/model/{}/{}".format(config.settings['data_path'], config.settings['run_name'], player_idx, ep_num)
+def load_model_config(p_idx: int) -> dict:
+    model_config = {}
 
-        model_files = [f for f in listdir(path) if isfile(join(path, f))]
-        model_path = None
-        optim_path = None
-        for mf in model_files:
-            if mf.endswith(".model"):
-                model_path = "{}/{}".format(path, mf)
-            else:
-                optim_path = "{}/{}".format(path, mf)
+    dir_path = "{}/models/{}".format(
+        config.settings['data_path'], config.settings["p{}_model".format(p_idx)]['name'])
+    path = "{}/model_config.json".format(dir_path)
+    if os.path.exists(path) and isfile(path):
+        with open(path) as f:
+            model_config = json.load(f)
+    else:
+        print("no p{} model_config.json, using config.yaml".format(p_idx))
+        Path(dir_path).mkdir(parents=True, exist_ok=True)
+        model_config_yaml = config.settings["p{}_model".format(p_idx)]
+        model_config['frames_per_observation'] = int(model_config_yaml['frames_per_observation'])
+        model_config['input_lookback'] = int(model_config_yaml['input_lookback'])
+        model_config['reaction_delay'] = int(model_config_yaml['reaction_delay'])
+        model_config['learning_rate'] = float(model_config_yaml['learning_rate'])
+        with open(path, "w") as f_writer:
+            f_writer.write(json.dumps(model_config))
 
-        if model_path is None:
-            print("no model in episode={} going to prev".format(ep_num))
-            continue
+    return model_config
 
-        print("loading model={}".format(path))
 
+def get_episode_from_path(path):
+    max_episode = 0
+    if os.path.exists(path):
+        episode_dirs = [f for f in listdir(path) if not isfile(join(path, f))]
+
+        for d in episode_dirs:
+            if d.isnumeric():
+                if int(d) > max_episode:
+                    max_episode = int(d)
+
+    return max_episode
+
+
+def load_model(model, optimizer, player_idx, device):
+    # path = "{}/eval/{}/model/{}/{}".format(config.settings['data_path'], config.settings['run_name'], player_idx, ep_num)
+    path = "{}/models/{}".format(
+        config.settings['data_path'], config.settings["p{}_model".format(player_idx)]['name'])
+
+    ep_num = get_episode_from_path(path)
+    path = "{}/{}".format(path, ep_num)
+
+    model_files = [f for f in listdir(path) if isfile(join(path, f))]
+    model_path = None
+    optim_path = None
+    for mf in model_files:
+        if mf.endswith(".model"):
+            model_path = "{}/{}".format(path, mf)
+        else:
+            optim_path = "{}/{}".format(path, mf)
+
+    print("loading model={}".format(path))
+    if model_path is not None and optim_path is not None:
         model.load_state_dict(torch.load(model_path, map_location=device))
         optimizer.load_state_dict(torch.load(optim_path))
         for state in optimizer.state.values():
@@ -96,13 +135,20 @@ def load_model(model, optimizer, player_idx, episode_number, device):
                     state[k] = v.to(device)
         print("loaded model = {}".format(model_path))
         print("loaded optimizer = {}".format(optim_path))
-        break
 
-    return model, optimizer
+        return True
+
+    return False
 
 
-def save_model(model, optim, player_idx, episode_num):
-    path = "{}/eval/{}/model/{}/{}/".format(config.settings['data_path'], config.settings['run_name'], player_idx, episode_num)
+def save_model(model, optim, player_idx):
+    # path = "{}/eval/{}/model/{}/{}/".format(config.settings['data_path'], config.settings['run_name'], player_idx, episode_num)
+
+    path = "{}/models/{}".format(
+        config.settings['data_path'], config.settings["p{}_model".format(player_idx)]['name'])
+
+    ep_num = get_episode_from_path(path)
+    path = "{}/{}".format(path, ep_num+1)
 
     Path(path).mkdir(parents=True, exist_ok=True)
 

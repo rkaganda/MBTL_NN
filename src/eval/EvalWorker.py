@@ -134,19 +134,13 @@ class EvalWorker(mp.Process):
             learning_rate=self.learning_rate
         )
         self.episode_number, self.run_count = eval_util.get_next_episode(player_idx=self.player_idx)
-
-        if self.episode_number > 0:
-            print("resuming player:{} on eps:{} run_count:{}".format(self.player_idx, self.episode_number,
-                                                                     self.run_count))
-            model.load_model(self.model, self.optimizer, self.player_idx, self.episode_number, device)
-            print("loaded model")
-        else:
+        if not model.load_model(self.model, self.optimizer, self.player_idx, device):
             print("fresh model")
             torch.manual_seed(0)
 
             model.weights_init_uniform_rule(model)
 
-            model.save_model(self.model, self.optimizer, self.player_idx, episode_num=-1)
+            model.save_model(self.model, self.optimizer, self.player_idx)
 
         self.target.load_state_dict(self.model.state_dict())
         self.model = self.model.to(device)
@@ -185,7 +179,7 @@ class EvalWorker(mp.Process):
 
         if config.settings['save_model'] and (self.run_count % config.settings['count_save']) == 0:
             self.reward_train()
-            model.save_model(self.model, self.optimizer, self.player_idx, episode_num=self.episode_number)
+            model.save_model(self.model, self.optimizer, self.player_idx)
             self.episode_number += 1
 
     def reward_train(self):
@@ -202,7 +196,7 @@ class EvalWorker(mp.Process):
             reward_columns=config.settings['reward_columns'][0],
             falloff=config.settings['reward_falloff'],
             player_idx=self.player_idx,
-            reaction_delay=config.settings['reaction_delay'],
+            reaction_delay=self.reaction_delay,
             hit_preframes=config.settings['hit_preframes'],
             atk_preframes=config.settings['atk_preframes'],
             whiff_reward=config.settings['whiff_reward'],

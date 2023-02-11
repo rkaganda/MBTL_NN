@@ -34,7 +34,6 @@ def store_eval_output(normalized_states: list, states: list, model_output: list,
         "state_format": state_format
     }
     Path("{}/evals/{}/{}".format(path, player_idx, episode_number)).mkdir(parents=True, exist_ok=True)
-    Path("{}/model/{}/{}".format(path, player_idx, episode_number)).mkdir(parents=True, exist_ok=True)
     Path("{}/stats/{}".format(path, player_idx)).mkdir(parents=True, exist_ok=True)
 
     with open("{}/evals/{}/{}/eval_{}.json".format(path, player_idx, episode_number, datetime_str), 'a') as f_writer:
