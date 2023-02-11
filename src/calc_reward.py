@@ -200,6 +200,12 @@ def calculate_reward_from_eval(
 
     eval_state_df['reward'] = 0  # set reward each frame to 0
 
+    # apply rewards for hitting and whiffing
+    eval_state_df = apply_motion_type_reward(eval_state_df, atk_preframes, whiff_reward)
+
+    # apply rewards for getting hit
+    eval_state_df = apply_negative_motion_type_reward(eval_state_df, atk_preframes, whiff_reward)
+
     # apply reward discounts
     eval_state_df = apply_reward_discount(eval_state_df, reward_gamma)
 
@@ -286,7 +292,6 @@ def apply_motion_type_reward(df: pd.DataFrame, atk_preframes: int, whiff_reward:
     # apply reward for each motion seg
     for hs in motion_type_segment:
         if (df[hs[0]:hs[1]][atk_col].sum() > 1) or (hs[0] in hit_motion_segments):  # if motion has attack in it or hits
-            atk_motion_type = df.loc[hs[0], 'p_0_motion_type']
             if df[hs[0]:hs[1]][enemy_hit_col].sum() > 1:  # if motion hits
                 reward_value = df[(df.index >= hs[0]) & (df.index <= hs[1])]['p_1_health_diff'].sum()
             else:
@@ -294,6 +299,61 @@ def apply_motion_type_reward(df: pd.DataFrame, atk_preframes: int, whiff_reward:
             df.loc[(df.index >= hs[0] - atk_preframes) & (df.index < hs[1] - atk_preframes), 'reward'] = \
                 df.loc[(df.index >= hs[0] - atk_preframes) & (
                             df.index < hs[1] - atk_preframes), 'reward'] + reward_value  # apply reward
+
+    return df
+
+
+def apply_negative_motion_type_reward(df: pd.DataFrame, atk_preframes: int, whiff_reward: float):
+    """
+    for each motion segment if the motion contains a atk apply reward if the attack hits
+    or apply whiff reward if the attack misses
+    :param p_idx: player to apply whiff reward to
+    :param df: the game state, each row is a frame
+    :param atk_preframes:
+    :param whiff_reward:
+    :return: the state dataframe with reward calculated for each frame/row
+    """
+
+    p_idx = 0
+    motion_type_col = 'p_{}_motion_type'.format(p_idx)
+    atk_col = 'p_1_atk'
+    player_hit_col = 'p_0_hit'
+
+    # calculate atk changes
+    v = (df[motion_type_col] != df[motion_type_col].shift()).cumsum()
+    u = df.groupby(v)[motion_type_col].agg(['all', 'count'])
+    m = u['all'] & u['count'].ge(1)
+
+    # create motion_type segments
+    motion_type_segment = df.groupby(v).apply(lambda x: (x.index[0], x.index[-1]))[m]
+
+    # calculate hit changes
+    v = (df[player_hit_col] != df[player_hit_col].shift()).cumsum()
+    u = df.groupby(v)[player_hit_col].agg(['all', 'count'])
+    m = u['all'] & u['count'].ge(1)
+
+    hit_motion_segments = {}
+    # create motion_type segments
+    hit_change_segments = df.groupby(v).apply(lambda x: (x.index[0], x.index[-1]))[m]
+    for hs in hit_change_segments:
+        # find the start of the motion type
+        hit_motion_type = df.loc[hs[0], 'p_0_motion_type']
+        hit_motion_start = hs[0]
+        while hit_motion_type == df.loc[hit_motion_start - 1, 'p_0_motion_type']:
+            hit_motion_start = hit_motion_start - 1
+        hit_motion_segments[hit_motion_start] = hs[1]
+
+    # apply reward for each motion seg
+    for hs in motion_type_segment:
+        if (df[hs[0]:hs[1]][atk_col].sum() > 1) and (
+                hs[0] in hit_motion_segments):  # if motion has attack in it or hits
+            if df[hs[0]:hs[1]][player_hit_col].sum() > 1:  # if motion hits
+                reward_value = df[(df.index >= hs[0]) & (df.index <= hit_motion_segments[hs[0]])][
+                    'p_0_health_diff'].sum()  # sum all damage for the entire hit segment
+
+                df.loc[(df.index >= hs[0] - atk_preframes) & (df.index < hs[0] + 1), 'reward'] = \
+                    df.loc[(df.index >= hs[0] - atk_preframes) & (
+                                df.index < hs[0] + 1), 'reward'] + reward_value  # apply reward
 
     return df
 
