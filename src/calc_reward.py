@@ -267,16 +267,33 @@ def apply_motion_type_reward(df: pd.DataFrame, atk_preframes: int, whiff_reward:
     # create motion_type segments
     motion_type_segment = df.groupby(v).apply(lambda x: (x.index[0], x.index[-1]))[m]
 
+    # calculate hit changes
+    v = (df[enemy_hit_col] != df[enemy_hit_col].shift()).cumsum()
+    u = df.groupby(v)[enemy_hit_col].agg(['all', 'count'])
+    m = u['all'] & u['count'].ge(1)
+
+    hit_motion_segments = []
+    # create motion_type segments
+    hit_change_segments = df.groupby(v).apply(lambda x: (x.index[0], x.index[-1]))[m]
+    for hs in hit_change_segments:
+        # find the start of the motion type
+        hit_motion_type = df.loc[hs[0], 'p_0_motion_type']
+        hit_motion_start = hs[0]
+        while hit_motion_type == df.loc[hit_motion_start - 1, 'p_0_motion_type']:
+            hit_motion_start = hit_motion_start - 1
+        hit_motion_segments.append(hit_motion_start)
+
     # apply reward for each motion seg
     for hs in motion_type_segment:
-        if df[hs[0]:hs[1]][atk_col].sum() > 1:  # if motion has attack in it
-            atk_motion_type = df.loc[hs[0],'p_0_motion_type']
+        if (df[hs[0]:hs[1]][atk_col].sum() > 1) or (hs[0] in hit_motion_segments):  # if motion has attack in it or hits
+            atk_motion_type = df.loc[hs[0], 'p_0_motion_type']
             if df[hs[0]:hs[1]][enemy_hit_col].sum() > 1:  # if motion hits
-                reward_value = df[(df.index>= hs[0]) & (df.index<=hs[1])]['p_1_health_diff'].sum()
+                reward_value = df[(df.index >= hs[0]) & (df.index <= hs[1])]['p_1_health_diff'].sum()
             else:
                 reward_value = whiff_reward
             df.loc[(df.index >= hs[0] - atk_preframes) & (df.index < hs[1] - atk_preframes), 'reward'] = \
-                df.loc[(df.index >= hs[0] - atk_preframes) & (df.index < hs[1] - atk_preframes), 'reward'] + reward_value  # apply reward
+                df.loc[(df.index >= hs[0] - atk_preframes) & (
+                            df.index < hs[1] - atk_preframes), 'reward'] + reward_value  # apply reward
 
     return df
 
