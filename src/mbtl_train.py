@@ -20,6 +20,7 @@ import config
 import mbtl_input
 import melty_state
 from eval.EvalWorker import EvalWorker
+import eval.model
 
 state_format = dict()
 state_format['directions'] = config.settings['directions']
@@ -122,9 +123,6 @@ def capture_rounds(round_num: int):
     env_status_['round_done'] = False  # round done event
 
     # params
-    frames_per_observation = int(config.settings['frames_per_observation'])
-    reaction_delay = int(config.settings['reaction_delay'])
-    learning_rate = float(config.settings['learning_rate'])
     timer_max = config.settings['timer_max']
 
     eval_statuses_ = dict()
@@ -135,7 +133,7 @@ def capture_rounds(round_num: int):
     player_facing_flag = dict()
 
     # for each player
-    for p in range(0, 2):
+    for p in range(0, 1):
         eval_statuses_[p] = manager.dict()  # share data across processes
         eval_statuses_[p]['kill_eval'] = False  # eval die
         eval_statuses_[p]['storing_eval'] = False  # eval storing data
@@ -145,21 +143,23 @@ def capture_rounds(round_num: int):
         input_indices[p] = Value('i', neutral_action_index)  # current player action/input
         player_facing_flag[p] = Value('i', facing_flag)  # current player action/input
 
+        model_config = eval.model.load_model_config(p)
+
         # create worker for evaluation/training/reward
         eval_w = EvalWorker(
             game_states=game_states_,
             env_status=env_status_,
             eval_status=eval_statuses_[p],
-            frames_per_evaluation=frames_per_observation,
-            reaction_delay=reaction_delay,
+            frames_per_evaluation=model_config['frames_per_observation'],
+            reaction_delay=model_config['reaction_delay'],
             input_index=input_indices[p],
             input_index_max=len(action_list[p])-1,
             state_format=state_format,
-            learning_rate=learning_rate,
+            learning_rate=model_config['learning_rate'],
             player_idx=p,
             frame_list=timer_log_,
             neutral_action_index=neutral_action_index,
-            input_lookback=config.settings['input_lookback'],
+            input_lookback=model_config['input_lookback'],
             player_facing_flag=player_facing_flag[p]
         )
         eval_workers[p] = eval_w
@@ -228,4 +228,4 @@ def capture_rounds(round_num: int):
 
 if __name__ == "__main__":
     mp.set_start_method('spawn')
-    capture_rounds(1)
+    capture_rounds(1000)

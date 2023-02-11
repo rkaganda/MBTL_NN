@@ -121,7 +121,6 @@ def train_model(reward_paths, stats_path, model, target, optim, epochs, episode_
                 "loss": train_loss,
                 "learning rate": lr
             }
-            break
 
     with open("{}/{}.json".format(stats_path, episode_num), 'a') as f_writer:
         f_writer.write(json.dumps(stats))

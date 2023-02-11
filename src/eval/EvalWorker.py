@@ -61,6 +61,8 @@ class EvalWorker(mp.Process):
         self.input_lookback = input_lookback
         self.player_facing_flag = player_facing_flag
 
+        # dora please
+
         self.relative_states = []
         self.state_format = state_format
         self.neutral_action_index = neutral_action_index
@@ -132,19 +134,13 @@ class EvalWorker(mp.Process):
             learning_rate=self.learning_rate
         )
         self.episode_number, self.run_count = eval_util.get_next_episode(player_idx=self.player_idx)
-
-        if self.episode_number > 0:
-            print("resuming player:{} on eps:{} run_count:{}".format(self.player_idx, self.episode_number,
-                                                                     self.run_count))
-            model.load_model(self.model, self.optimizer, self.player_idx, self.episode_number, device)
-            print("loaded model")
-        else:
+        if not model.load_model(self.model, self.optimizer, self.player_idx, device):
             print("fresh model")
             torch.manual_seed(0)
 
             model.weights_init_uniform_rule(model)
 
-            model.save_model(self.model, self.optimizer, self.player_idx, episode_num=-1)
+            model.save_model(self.model, self.optimizer, self.player_idx)
 
         self.target.load_state_dict(self.model.state_dict())
         self.model = self.model.to(device)
@@ -182,9 +178,8 @@ class EvalWorker(mp.Process):
             self.target.load_state_dict(self.model.state_dict())
 
         if config.settings['save_model'] and (self.run_count % config.settings['count_save']) == 0:
-            print("epoch cleanup...")
             self.reward_train()
-            model.save_model(self.model, self.optimizer, self.player_idx, episode_num=self.episode_number)
+            model.save_model(self.model, self.optimizer, self.player_idx)
             self.episode_number += 1
 
     def reward_train(self):
@@ -198,11 +193,10 @@ class EvalWorker(mp.Process):
         reward_paths = calc_reward.generate_rewards(
             reward_path=reward_path,
             eval_path=eval_path,
-            reward_columns=config.settings['reward_columns'][self.player_idx],
+            reward_columns=config.settings['reward_columns'][0],
             falloff=config.settings['reward_falloff'],
             player_idx=self.player_idx,
-            reaction_delay=config.settings['reaction_delay'],
-            hit_preframes=config.settings['hit_preframes'],
+            reaction_delay=self.reaction_delay,
             atk_preframes=config.settings['atk_preframes'],
             whiff_reward=config.settings['whiff_reward'],
             reward_gamma=config.settings['reward_gamma']
@@ -235,6 +229,9 @@ class EvalWorker(mp.Process):
             final_epsilon = config.settings['final_epsilon']
             initial_epsilon = config.settings['initial_epsilon']
             epsilon_decay = config.settings['epsilon_decay']
+            eps_threshold = initial_epsilon
+            esp_count = 0
+            no_explore_count = 0
 
             self.eval_status['eval_ready'] = True  # eval is ready
             while not self.eval_status['kill_eval']:
@@ -260,14 +257,6 @@ class EvalWorker(mp.Process):
                         # if reaction time has passed, and we have enough frames to eval
                         if ((last_normalized_index - self.reaction_delay) >= last_evaluated_index) and (
                                 (len(normalized_states) - self.reaction_delay) >= self.frames_per_evaluation):
-
-                            # exploration calculation
-                            esp_count = self.run_count
-
-                            eps_threshold = final_epsilon + (initial_epsilon - final_epsilon) * \
-                                math.exp(-1. * esp_count / epsilon_decay)
-
-                            self.epsilon = eps_threshold
 
                             # create slice for evaluation
                             evaluation_frames = normalized_states[:-self.reaction_delay]
@@ -299,6 +288,7 @@ class EvalWorker(mp.Process):
                                 detached_out = out_tensor.detach().cpu()
                             try:
                                 action_index = torch.argmax(detached_out).numpy()
+
                             except RuntimeError as e:
                                 logger.debug("in_tensor={}".format(in_tensor))
                                 logger.debug("detached_out={}".format(action_index))
@@ -330,7 +320,22 @@ class EvalWorker(mp.Process):
                     else:
                         pass  # no states yet
                 if not did_store and len(model_output) > 0:  # if we didn't store yet and there are states to store
-                    print("eps_threshold={}".format(self.epsilon))
+                    # dora
+                    eps_threshold = final_epsilon + (initial_epsilon - final_epsilon) * \
+                                    math.exp(-1. * esp_count / epsilon_decay)
+
+                    if eps_threshold <= config.settings['eps_explore_threshold']:
+                        no_explore_count = no_explore_count + 1
+
+                    if no_explore_count >= config.settings['no_explore_limit']:
+                        esp_count = 0
+                        no_explore_count = 0
+                    else:
+                        esp_count = esp_count + 1
+
+                    self.epsilon = round(eps_threshold, 2)
+                    print("eps={} no_explore={}".format(self.epsilon, no_explore_count))
+
                     logger.debug("{} eval cleanup".format(self.player_idx))
                     self.eval_status['eval_ready'] = False  # eval is not ready
                     logger.debug("{} stopping eval".format(self.player_idx))
