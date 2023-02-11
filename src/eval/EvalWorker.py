@@ -197,7 +197,6 @@ class EvalWorker(mp.Process):
             falloff=config.settings['reward_falloff'],
             player_idx=self.player_idx,
             reaction_delay=self.reaction_delay,
-            hit_preframes=config.settings['hit_preframes'],
             atk_preframes=config.settings['atk_preframes'],
             whiff_reward=config.settings['whiff_reward'],
             reward_gamma=config.settings['reward_gamma']
@@ -289,6 +288,7 @@ class EvalWorker(mp.Process):
                                 detached_out = out_tensor.detach().cpu()
                             try:
                                 action_index = torch.argmax(detached_out).numpy()
+
                             except RuntimeError as e:
                                 logger.debug("in_tensor={}".format(in_tensor))
                                 logger.debug("detached_out={}".format(action_index))

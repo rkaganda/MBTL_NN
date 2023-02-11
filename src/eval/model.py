@@ -116,27 +116,28 @@ def load_model(model, optimizer, player_idx, device):
     ep_num = get_episode_from_path(path)
     path = "{}/{}".format(path, ep_num)
 
-    model_files = [f for f in listdir(path) if isfile(join(path, f))]
-    model_path = None
-    optim_path = None
-    for mf in model_files:
-        if mf.endswith(".model"):
-            model_path = "{}/{}".format(path, mf)
-        else:
-            optim_path = "{}/{}".format(path, mf)
+    if os.path.exists(path):
+        model_files = [f for f in listdir(path) if isfile(join(path, f))]
+        model_path = None
+        optim_path = None
+        for mf in model_files:
+            if mf.endswith(".model"):
+                model_path = "{}/{}".format(path, mf)
+            else:
+                optim_path = "{}/{}".format(path, mf)
 
-    print("loading model={}".format(path))
-    if model_path is not None and optim_path is not None:
-        model.load_state_dict(torch.load(model_path, map_location=device))
-        optimizer.load_state_dict(torch.load(optim_path))
-        for state in optimizer.state.values():
-            for k, v in state.items():
-                if isinstance(v, torch.Tensor):
-                    state[k] = v.to(device)
-        print("loaded model = {}".format(model_path))
-        print("loaded optimizer = {}".format(optim_path))
+        print("loading model={}".format(path))
+        if model_path is not None and optim_path is not None:
+            model.load_state_dict(torch.load(model_path, map_location=device))
+            optimizer.load_state_dict(torch.load(optim_path, map_location=device))
+            for state in optimizer.state.values():
+                for k, v in state.items():
+                    if isinstance(v, torch.Tensor):
+                        state[k] = v.to(device)
+            print("loaded model = {}".format(model_path))
+            print("loaded optimizer = {}".format(optim_path))
 
-        return True
+            return True
 
     return False
 

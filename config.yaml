@@ -13,16 +13,15 @@ count_save: 1
 
 # explore
 final_epsilon:  0
-initial_epsilon: 0
+initial_epsilon: 100
 epsilon_decay: 100
 no_explore_limit: 10
 eps_explore_threshold: .05
 
 
 # reward
-hit_preframes: 20
 reward_gamma: .8
-atk_preframes: 8
+atk_preframes: 3
 whiff_reward: -1000
 reward_columns:
   0:
@@ -37,8 +36,8 @@ reward_falloff: 25
 episode_sample_size: 1
 last_episode_only: False
 batch_size: 512
-epochs: 2
-tau: 50
+epochs: 50
+tau: 20
 
 # inputs
 directions:
