@@ -109,6 +109,8 @@ def print_q(action, q):
         for _ in range(0, num):
             bar_str = bar_str + "="
             bar_len = bar_len + 1
+        q = round(q,2)
+        norm_q = round(norm_q, 2)
     else:
         q = "*"
         norm_q = "*"
