@@ -220,7 +220,7 @@ def calculate_reward_from_eval(
     eval_state_df = remove_rewards_during_hit(eval_state_df)
 
     # trim full df down to just state, action, reward
-    output_with_input_and_reward = trim_reward_df(eval_state_df, 'actual_reward')
+    output_with_input_and_reward = trim_reward_df(eval_state_df, 'actual_reward', reaction_delay)
 
     return output_with_input_and_reward
 
