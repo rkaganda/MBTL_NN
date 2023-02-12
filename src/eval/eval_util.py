@@ -122,7 +122,7 @@ def print_q(action, q):
 
     sys.stdout.write("\r action= {} est_norm_Q= {} est_Q= {} {}".format(
         str(action).ljust(3),
-        str(norm_q).ljust(4),
-        str(q).ljust(3),
+        str(norm_q).ljust(5),
+        str(q).ljust(5),
         bar_str))
     sys.stdout.flush()
