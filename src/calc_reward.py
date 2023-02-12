@@ -149,21 +149,24 @@ def generate_diff(eval_state_df: pd.DataFrame, reward_columns: dict) -> pd.DataF
     return eval_state_df
 
 
-def trim_reward_df(eval_state_df: pd.DataFrame, reward_column: str) -> pd.DataFrame:
+def trim_reward_df(df: pd.DataFrame, reward_column: str) -> pd.DataFrame:
     """
     remove all columns not needed to generate reward file
-    :param eval_state_df:
+    :param df:
     :param reward_column:
     :return:
     """
-    state_columns = [c for c in eval_state_df.columns if c.startswith('state')]
-    eval_state_df = eval_state_df[state_columns + [reward_column] + ['input']]
-    eval_state_df.rename(columns={reward_column: "reward"}, inplace=True)
+    state_columns = [c for c in df.columns if c.startswith('state')]
+    df = df[state_columns + [reward_column] + ['input']]
+    df = df.rename(columns={reward_column: "reward"})
 
-    eval_state_df = eval_state_df[:-1]
-    eval_state_df = eval_state_df.dropna()
+    df = df[:-1]
+    df = df.dropna()
 
-    return eval_state_df
+    # z-score
+    df['reward'] = (df['reward'] - 242.558952) / 758.366903
+
+    return df
 
 
 def calculate_reward_from_eval(
