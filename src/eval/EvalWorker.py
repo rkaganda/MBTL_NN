@@ -287,7 +287,7 @@ class EvalWorker(mp.Process):
                                     out_tensor = self.model(in_tensor)
 
                                 detached_out = out_tensor.detach().cpu()
-                                max_q = torch.max(detached_out).numpy()
+                                max_q = torch.max(detached_out).numpy().item()
                             try:
                                 action_index = torch.argmax(detached_out).numpy()
                                 eval_util.print_q(action=action_index, q=max_q)
