@@ -365,7 +365,6 @@ def apply_negative_motion_type_reward(df: pd.DataFrame, atk_preframes: int, whif
     # apply reward for each motion seg
     for hs in motion_type_segment:
         if hs[0] in hit_motion_segments_value:  # if motion has attack in it or hits
-            print("hit = {}".format(hs[0]))
             df.loc[(df.index >= hs[0] - atk_preframes) & (df.index < hs[1]), 'reward'] = \
                 df.loc[(df.index >= hs[0] - atk_preframes) & (df.index < hs[1]), 'reward'] + hit_motion_segments_value[
                     hs[0]]  # apply reward

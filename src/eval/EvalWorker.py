@@ -277,6 +277,7 @@ class EvalWorker(mp.Process):
 
                             if random.random() < eps_threshold:
                                 detached_out = torch.Tensor(np.random.rand(self.input_index_max + 1))
+                                max_q = None
                             else:
                                 # create tensor
                                 in_tensor = torch.Tensor(flat_frames).to(device)
@@ -286,8 +287,10 @@ class EvalWorker(mp.Process):
                                     out_tensor = self.model(in_tensor)
 
                                 detached_out = out_tensor.detach().cpu()
+                                max_q = torch.max(detached_out).numpy()
                             try:
                                 action_index = torch.argmax(detached_out).numpy()
+                                eval_util.print_q(action=action_index, q=max_q)
 
                             except RuntimeError as e:
                                 logger.debug("in_tensor={}".format(in_tensor))
