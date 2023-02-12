@@ -156,11 +156,12 @@ def trim_reward_df(eval_state_df: pd.DataFrame, reward_column: str) -> pd.DataFr
     :param reward_column:
     :return:
     """
-    eval_state_df.rename(columns={reward_column: "reward"}, inplace=True)
     state_columns = [c for c in eval_state_df.columns if c.startswith('state')]
-    eval_state_df = eval_state_df[state_columns + ['reward'] + ['input']]
+    eval_state_df = eval_state_df[state_columns + [reward_column] + ['input']]
+    eval_state_df.rename(columns={reward_column: "reward"}, inplace=True)
 
     eval_state_df = eval_state_df[:-1]
+    eval_state_df = eval_state_df.dropna()
 
     return eval_state_df
 
@@ -213,7 +214,7 @@ def calculate_reward_from_eval(
     eval_state_df = remove_rewards_during_hit(eval_state_df)
 
     # trim full df down to just state, action, reward
-    output_with_input_and_reward = trim_reward_df(eval_state_df, 'reward_total_norm')
+    output_with_input_and_reward = trim_reward_df(eval_state_df, 'actual_reward')
 
     return output_with_input_and_reward
 
