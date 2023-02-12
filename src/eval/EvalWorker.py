@@ -289,7 +289,7 @@ class EvalWorker(mp.Process):
                                 detached_out = out_tensor.detach().cpu()
                                 max_q = torch.max(detached_out).numpy().item()
                             try:
-                                action_index = torch.argmax(detached_out).numpy()
+                                action_index = torch.argmax(detached_out).numpy().item()
                                 eval_util.print_q(action=action_index, q=max_q)
 
                             except RuntimeError as e:
