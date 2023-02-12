@@ -303,9 +303,9 @@ def apply_motion_type_reward(df: pd.DataFrame, atk_preframes: int, whiff_reward:
                 reward_value = df[(df.index >= hs[0]) & (df.index <= hs[1])]['p_1_health_diff'].sum()
             else:
                 reward_value = whiff_reward
-            df.loc[(df.index >= hs[0] - atk_preframes) & (df.index < hs[1] - atk_preframes), 'reward'] = \
+            df.loc[(df.index >= hs[0] - atk_preframes) & (df.index < hs[0] + 1), 'reward'] = \
                 df.loc[(df.index >= hs[0] - atk_preframes) & (
-                            df.index < hs[1] - atk_preframes), 'reward'] + reward_value  # apply reward
+                            df.index < hs[0] + 1), 'reward'] + reward_value  # apply reward
 
     return df
 
