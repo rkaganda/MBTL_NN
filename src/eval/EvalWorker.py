@@ -305,7 +305,7 @@ class EvalWorker(mp.Process):
                             normalized_states[last_evaluated_index]['input'] = input_frames
                             model_output[last_evaluated_index] = {
                                 'pred_q': max_q,
-                                'input': action_index,
+                                'action_index': action_index,
                                 'output': list(detached_out.numpy()),
                                 'frame': self.frame_list[-1],
                                 'state': flat_frames,
