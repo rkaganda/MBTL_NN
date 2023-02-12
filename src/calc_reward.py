@@ -164,7 +164,7 @@ def trim_reward_df(df: pd.DataFrame, reward_column: str, reaction_delay: int) ->
     df = df[:-1]
 
     # z-score
-    df['reward'] = (df['reward'] - 242.558952) / 758.366903
+    df['reward'] = df['reward'] / 4000
     df['reward'] = df['reward'].shift(-reaction_delay)
 
     df = df.dropna()
@@ -252,6 +252,7 @@ def remove_rewards_during_hit(df: pd.DataFrame):
     hit_col = 'p_{}_hit'.format(p_idx)
 
     df = df[df[hit_col] == 0]
+    # df = df[df['actual_reward'] != 0]
 
     return df
 
