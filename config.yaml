@@ -1,9 +1,17 @@
-run_name: "count_shiki"
+run_name: "count_shiki_1f_new"
 
 p0_model:
-  name: "count_v_shiki"
+  name: "count_v_shiki_1f_new"
   frames_per_observation: 2
-  reaction_delay: 20
+  reaction_delay: 1
+  input_lookback: 6
+  learning_rate: 1e-5
+
+
+p1_model:
+  name: "shiki_v_count_1f_new"
+  frames_per_observation: 2
+  reaction_delay: 1
   input_lookback: 6
   learning_rate: 1e-5
 

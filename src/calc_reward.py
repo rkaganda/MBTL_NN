@@ -225,19 +225,17 @@ def calculate_reward_from_eval(
     return output_with_input_and_reward
 
 
-def apply_reward_discount(df: pd.DataFrame, gamma: float) -> pd.DataFrame:
-    """
-    apply custom discount reward function to
-    :param df:
-    :param gamma:
-    :return:
-    """
-    df['discounted_reward'] = df['reward']
-    for n in range(0, 5):
-        df['discounted_reward'] = (df['discounted_reward'] + df['discounted_reward'].shift(-1) * gamma) * .5
-
-        df['actual_reward'] = df.apply(
-            lambda x: x['reward'] if abs(x['reward']) > abs(x['discounted_reward']) else x['discounted_reward'], axis=1)
+def apply_reward_discount(df, discount_factor):
+    discounted_rewards = []
+    cumulative_reward = 0
+    rewards = df['reward'].to_list()
+    for reward in rewards[::-1]:
+        cumulative_reward = reward + cumulative_reward * discount_factor
+        discounted_rewards.append(cumulative_reward)
+    discounted_rewards = discounted_rewards[::-1]
+    df['discounted_reward'] = discounted_rewards
+    # df['actual_reward'] = df.apply(lambda x: x['reward'] if abs(x['reward']) > abs(x['discounted_reward']) else x['discounted_reward'], axis=1)
+    df['actual_reward'] = df['discounted_reward']
 
     return df
 
@@ -304,9 +302,9 @@ def apply_motion_type_reward(df: pd.DataFrame, atk_preframes: int, whiff_reward:
                 reward_value = df[(df.index >= hs[0]) & (df.index <= hs[1])]['p_1_health_diff'].sum()
             else:
                 reward_value = whiff_reward
-            df.loc[(df.index >= hs[0] - atk_preframes) & (df.index < hs[0] + 1), 'reward'] = \
-                df.loc[(df.index >= hs[0] - atk_preframes) & (
-                            df.index < hs[0] + 1), 'reward'] + reward_value  # apply reward
+            df.loc[(df.index >= hs[0] - atk_preframes) & (df.index < hs[0]), 'reward'] = \
+                df.loc[
+                    (df.index >= hs[0] - atk_preframes) & (df.index < hs[0]), 'reward'] + reward_value  # apply reward
 
     return df
 
@@ -366,8 +364,8 @@ def apply_negative_motion_type_reward(df: pd.DataFrame, atk_preframes: int, whif
     # apply reward for each motion seg
     for hs in motion_type_segment:
         if hs[0] in hit_motion_segments_value:  # if motion has attack in it or hits
-            df.loc[(df.index >= hs[0] - atk_preframes) & (df.index < hs[1]), 'reward'] = \
-                df.loc[(df.index >= hs[0] - atk_preframes) & (df.index < hs[1]), 'reward'] + hit_motion_segments_value[
+            df.loc[(df.index >= hs[0] - atk_preframes) & (df.index < hs[0]), 'reward'] = \
+                df.loc[(df.index >= hs[0] - atk_preframes) & (df.index < hs[0]), 'reward'] + hit_motion_segments_value[
                     hs[0]]  # apply reward
 
     return df

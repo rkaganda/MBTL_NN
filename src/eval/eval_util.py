@@ -93,35 +93,10 @@ def get_next_episode(player_idx):
     return max_episode, run_count
 
 
-def print_q(action, q):
-    total_len = 30
-    bar_str = "["
-    bar_len = 0
-
-    if q is not None:
-        min_q = -7
-        max_q = 3
-
-        norm_q = (max_q - q) / (max_q - min_q)
-        r_q = round(norm_q, 2)
-        num = round(total_len - (r_q * total_len))
-
-        for _ in range(0, num):
-            bar_str = bar_str + "="
-            bar_len = bar_len + 1
-        q = round(q,2)
-        norm_q = round(norm_q, 2)
-    else:
-        q = "*"
-        norm_q = "*"
-
-    for _ in range(bar_len, total_len):
-        bar_str = bar_str + " "
-
-    bar_str = bar_str + "]"
-
-    sys.stdout.write("\r action= {} est_norm_Q= {} est_Q= {}".format(
+def print_q(cur_frame, eval_frame, action, q):
+    sys.stdout.write("\r cur_frame={}, eval_frame={}, action= {} est_Q= {}".format(
+        str(cur_frame).ljust(4),
+        str(eval_frame).ljust(4),
         str(action).ljust(3),
-        str(norm_q).ljust(5),
         str(q).ljust(5)))
     sys.stdout.flush()
