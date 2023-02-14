@@ -312,6 +312,7 @@ class EvalWorker(mp.Process):
                                 'action_index': action_index,
                                 'output': list(detached_out.numpy()),
                                 'frame': self.frame_list[-1],
+                                'state': flat_frames,
                                 'states': len(self.states),
                                 'norm_states': len(normalized_states),
                                 'last_evaluated_index': last_evaluated_index,
