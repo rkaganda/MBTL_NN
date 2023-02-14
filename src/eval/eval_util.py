@@ -6,6 +6,7 @@ import config
 import os
 from os import listdir
 from os.path import isfile, join
+import sys
 
 
 def store_eval_output(normalized_states: list, states: list, model_output: list, state_format: dict, player_idx: int,
@@ -90,3 +91,12 @@ def get_next_episode(player_idx):
             print("no path {}".format(episode_path))
 
     return max_episode, run_count
+
+
+def print_q(cur_frame, eval_frame, action, q):
+    sys.stdout.write("\r cur_frame={}, eval_frame={}, action= {} est_Q= {}".format(
+        str(cur_frame).ljust(4),
+        str(eval_frame).ljust(4),
+        str(action).ljust(3),
+        str(q).ljust(5)))
+    sys.stdout.flush()
