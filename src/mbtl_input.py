@@ -245,9 +245,9 @@ def do_inputs(input_index, action_list: list, die, env_status, player_facing_fla
     while not die.is_set():
         if not env_status['round_done']:  # if round is live
             time.sleep(.013)  # sleep a frame
-            inputs_hold.clear()  # clear held inputs buffer
             for k in inputs_hold:
                 ReleaseKey(k)
+            inputs_hold.clear()  # clear held inputs buffer
             for k in action_list[player_facing_flag.value][input_index.value]:  # for each key
                 if k not in inputs_held:  # if key is not already being held
                     PressKey(k)  # press key
