@@ -19,8 +19,8 @@ import logging
 import config
 import mbtl_input
 import melty_state
-from eval.EvalWorker import EvalWorker
-import eval.model
+from eval_ffn.EvalWorker import EvalWorker
+import eval_ffn.model
 
 state_format = dict()
 state_format['directions'] = config.settings['directions']
@@ -143,7 +143,7 @@ def capture_rounds(round_num: int):
         input_indices[p] = Value('i', neutral_action_index)  # current player action/input
         player_facing_flag[p] = Value('i', facing_flag)  # current player action/input
 
-        model_config = eval.model.load_model_config(p)
+        model_config = eval_ffn.model.load_model_config(p)
 
         # create worker for evaluation/training/reward
         eval_w = EvalWorker(
