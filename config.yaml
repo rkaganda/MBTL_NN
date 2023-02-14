@@ -1,7 +1,7 @@
-run_name: "count_shiki_1f_new"
+run_name: "count_shiki_.95_reduc_5f_obs"
 
 p0_model:
-  name: "count_v_shiki_1f_new"
+  name: "count_v_shiki_.95_reduc_5f_obs"
   frames_per_observation: 2
   reaction_delay: 1
   input_lookback: 6
@@ -9,7 +9,7 @@ p0_model:
 
 
 p1_model:
-  name: "shiki_v_count_1f_new"
+  name: "shiki_v_count_.95_reduc_5f_obs"
   frames_per_observation: 2
   reaction_delay: 1
   input_lookback: 6
@@ -24,11 +24,11 @@ final_epsilon:  0
 initial_epsilon: 1
 epsilon_decay: 100
 no_explore_limit: 10
-eps_explore_threshold: .05
+eps_explore_threshold: -1
 
 
 # reward
-reward_gamma: .8
+reward_gamma: .95
 atk_preframes: 3
 whiff_reward: -1000
 reward_columns:
