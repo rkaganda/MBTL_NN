@@ -216,7 +216,7 @@ class EvalWorker(mp.Process):
 
         train_rnn_model.train_model(reward_sample, stats_path, self.model, self.target, self.optimizer,
                                     config.settings['epochs'],
-                                    self.episode_number)
+                                    self.episode_number, self.frames_per_evaluation)
 
     def run(self):
         try:

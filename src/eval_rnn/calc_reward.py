@@ -335,10 +335,9 @@ def apply_negative_motion_type_reward(df: pd.DataFrame, atk_preframes: int, whif
     return df
 
 
-def generate_json_from_in_out_df(output_with_input_and_reward: pd.DataFrame, frames_per_observation: int):
+def generate_json_from_in_out_df(output_with_input_and_reward: pd.DataFrame):
     """
     creates reward json from reward dataframe
-    :param frames_per_observation:
     :param output_with_input_and_reward:
     :return:
     """
@@ -347,21 +346,7 @@ def generate_json_from_in_out_df(output_with_input_and_reward: pd.DataFrame, fra
     state_columns = [c for c in output_with_input_and_reward.columns if c.startswith('input_')]
     action_columns = [c for c in output_with_input_and_reward.columns if c.startswith('action_index')]
 
-    state_sequences = []
-    state_list = output_with_input_and_reward[state_columns].values.tolist()
-    input_size = len(state_list[0])
-
-    for idx, seq in enumerate(state_list):
-        idx = idx + 1
-        start_idx = (idx - frames_per_observation) if (idx - frames_per_observation) > 0 else 0
-        padding = frames_per_observation - idx
-        if padding > 0:
-            seq_list = [list(0 for r in range(input_size)) for n in range(padding)] + state_list[start_idx: idx]
-        else:
-            seq_list = state_list[start_idx: idx]
-        state_sequences.append(seq_list)
-
-    json_dict['state'] = state_sequences
+    json_dict['state'] = output_with_input_and_reward[state_columns].values.tolist()
     json_dict['reward'] = output_with_input_and_reward['reward'].values.tolist()
     json_dict['action'] = output_with_input_and_reward[action_columns].values.tolist()
 
@@ -404,8 +389,7 @@ def generate_rewards(eval_path: str, reward_path: str, reward_columns: dict, fal
                     whiff_reward=whiff_reward,
                     reward_gamma=reward_gamma)
                 file_json = generate_json_from_in_out_df(
-                    output_with_input_and_reward=df,
-                    frames_per_observation=frames_per_observation)
+                    output_with_input_and_reward=df)
 
                 with open("{}/{}".format(reward_path, reward_file), 'w') as f_writer:
                     f_writer.write(json.dumps(file_json))
