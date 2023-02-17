@@ -86,7 +86,10 @@ def train(model, target, optim, data):
     pred_q, _ = model(state)
     better_q = pred_q.clone().scatter_(1, actions[0].to(torch.int64), rewards[0].unsqueeze(1))
 
-    loss = F.smooth_l1_loss(pred_q, better_q).to(device)
+    # loss = F.smooth_l1_loss(pred_q, better_q).to(device)
+    criteron = nn.CrossEntropyLoss()
+    loss = criteron(pred_q, better_q.softmax(dim=1)).to(device)
+
     optim.zero_grad()
     loss.backward()
     for param in model.parameters():
