@@ -53,13 +53,11 @@ class Model(nn.Module):
         return hidden
 
 
-def setup_model(frames_per_observation, state_size, actions_size, learning_rate):
-    input_layer_size = (state_size * 2) + 1
-    print("input_layer_size={}".format(input_layer_size))
+def setup_model(input_size, actions_size, learning_rate):
     model = Model(
-        input_size=(frames_per_observation * (state_size * 2)) + frames_per_observation,
+        input_size=input_size,
         output_size=actions_size,
-        hidden_dim=(frames_per_observation * (state_size * 2)) + frames_per_observation,
+        hidden_dim=input_size,
         num_layers=2
     )
     model.share_memory()

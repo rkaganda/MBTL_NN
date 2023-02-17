@@ -43,13 +43,15 @@ def load_reward_data(reward_paths):
             file_dict = json.load(f)
         for k_, i_ in file_dict.items():
             full_data[k_] = full_data[k_] + i_
+        state_size = len(full_data['state'][0][0])
+        sequence_size = len(full_data['state'][0])
         next_state = copy.deepcopy(file_dict['state'])
         next_state = next_state[1:]
-        next_state.append([0] * len(next_state[0]))
-        full_data['next_state'] = full_data['next_state'] + next_state
+        next_state.append([list(0 for n in range(state_size)) for n in range(sequence_size)])
+        full_data['next_state'] = next_state
         done = [0] * len(next_state)
         done[-1] = 1
-        full_data['done'] = full_data['done'] + done
+        full_data['done'] = done
     return full_data
 
 
@@ -63,24 +65,28 @@ def create_dataset(data):
     return td.TensorDataset(state_tensor, action_tensor, reward_tensor, next_state_tensor, done)
 
 
-def train(model, target, optim, criterion, data, batch_size):
+def train(model, target, optim, data):
     state = Variable(data[0])
     next_states = Variable(data[3])
     actions = Variable(data[1])
     rewards = Variable(data[2])
     done = Variable(data[4])
 
+    batch_size = len(data[0])
+
     model.train()
     train_loss = 0
 
-    pred_q = model(state).gather(1, actions.type(torch.int64))
-    next_state_q_vals = torch.zeros(len(data[0])).to(device)
+    pred_q, _ = model(state)
+    pred_q = pred_q.gather(1, actions.type(torch.int64))
+    next_state_q_vals = torch.zeros(batch_size).to(device)
 
     for idx, next_state in enumerate(next_states):
         if done[idx] == 1:
             next_state_q_vals[idx] = -1
         else:
-            next_state_q_vals[idx] = (target(next_states[idx]).max(0)[0])
+            next_state_q, hidden_state = target(next_state.unsqueeze(0))
+            next_state_q_vals[idx] = next_state_q[-1].argmax()
 
     better_pred = (rewards + next_state_q_vals).unsqueeze(1)
 
@@ -94,7 +100,7 @@ def train(model, target, optim, criterion, data, batch_size):
 
     train_loss += loss.item()
 
-    return train_loss, 0
+    return train_loss, optim.param_groups[0]['lr']
 
 
 def train_model(reward_paths, stats_path, model, target, optim, epochs, episode_num):
@@ -114,7 +120,7 @@ def train_model(reward_paths, stats_path, model, target, optim, epochs, episode_
 
     for epoch in tqdm(range(0, epochs)):
         for step, batch_data in enumerate(train_loader):
-            train_loss, lr = train(model, target, optim, criterion, batch_data, batch_size)
+            train_loss, lr = train(model, target, optim, batch_data)
             stats[step] = {
                 "epoch": epoch,
                 "batch_size": len(batch_data[0]),

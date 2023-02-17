@@ -216,9 +216,6 @@ def calculate_reward_from_eval(
     # apply reward discounts
     eval_state_df = apply_reward_discount(eval_state_df, reward_gamma)
 
-    # remove rewards during hit state
-    eval_state_df = remove_rewards_during_hit(eval_state_df)
-
     # trim full df down to just state, action, reward
     output_with_input_and_reward = trim_reward_df(eval_state_df, 'actual_reward', reaction_delay)
 
@@ -234,23 +231,8 @@ def apply_reward_discount(df, discount_factor):
         discounted_rewards.append(cumulative_reward)
     discounted_rewards = discounted_rewards[::-1]
     df['discounted_reward'] = discounted_rewards
-    # df['actual_reward'] = df.apply(lambda x: x['reward'] if abs(x['reward']) > abs(x['discounted_reward']) else x['discounted_reward'], axis=1)
+
     df['actual_reward'] = df['discounted_reward']
-
-    return df
-
-
-def remove_rewards_during_hit(df: pd.DataFrame):
-    """
-        removes reward data when player is being hit as meaningful actions can be preformed during this time
-        if enemy player is not hit during the player atk frames
-        :param df: the game state, each row is a frame
-        """
-    p_idx = 0
-    hit_col = 'p_{}_hit'.format(p_idx)
-
-    df = df[df[hit_col] == 0]
-    # df = df[df['actual_reward'] != 0]
 
     return df
 

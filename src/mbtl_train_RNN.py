@@ -133,7 +133,7 @@ def capture_rounds(round_num: int):
     player_facing_flag = dict()
 
     # for each player
-    for p in range(0, 2):
+    for p in range(0, 1):
         eval_statuses_[p] = manager.dict()  # share data across processes
         eval_statuses_[p]['kill_eval'] = False  # eval die
         eval_statuses_[p]['storing_eval'] = False  # eval storing data
@@ -159,7 +159,6 @@ def capture_rounds(round_num: int):
             player_idx=p,
             frame_list=timer_log_,
             neutral_action_index=neutral_action_index,
-            input_lookback=model_config['input_lookback'],
             player_facing_flag=player_facing_flag[p]
         )
         eval_workers[p] = eval_w

@@ -28,7 +28,7 @@ class EvalWorker(mp.Process):
     def __init__(self, game_states: list, frames_per_evaluation: int, reaction_delay: int, env_status: dict,
                  eval_status: dict,
                  input_index: int, input_index_max: int, state_format: dict, player_facing_flag: int,
-                 learning_rate: float, player_idx: int, frame_list: list, neutral_action_index: int, input_lookback: int):
+                 learning_rate: float, player_idx: int, frame_list: list, neutral_action_index: int):
         """
 
         :param game_states: list of game states for the current round index by frame
@@ -43,8 +43,7 @@ class EvalWorker(mp.Process):
         :param player_idx: index of player for this eval
         :param frame_list: list of frame numbers
         :param neutral_action_index: index for neutral action (no buttons pressed)
-        :param input_lookback: how many input frames add to model input
-        :param input_lookback: the flag for what direction the player is facing
+        :param player_facing_flag: the flag for what direction the player is facing
         """
         super(EvalWorker, self).__init__()
         self.states = game_states
@@ -58,7 +57,6 @@ class EvalWorker(mp.Process):
         self.learning_rate = learning_rate
         self.player_idx = player_idx
         self.frame_list = frame_list
-        self.input_lookback = input_lookback
         self.player_facing_flag = player_facing_flag
 
         # dora please
@@ -71,7 +69,7 @@ class EvalWorker(mp.Process):
         self.model = None
         self.target = None
         self.optimizer = None
-        self.hidden_state_size = (len(self.state_format['attrib']) * 2) + 1
+        self.model_input_size = (len(self.state_format['attrib']) * 2) + 1
 
         self.episode_number = 0
 
@@ -120,15 +118,14 @@ class EvalWorker(mp.Process):
         :return:
         """
         self.model, self.optimizer = model.setup_model(
-            frames_per_observation=self.frames_per_evaluation,
             actions_size=self.input_index_max + 1,
-            state_size=len(self.state_format['attrib']),
+            input_size=self.model_input_size,
             learning_rate=self.learning_rate
         )
-        self.model, self.optimizer = model.setup_model(
-            frames_per_observation=self.frames_per_evaluation,
+
+        self.target, _ = model.setup_model(
             actions_size=self.input_index_max + 1,
-            state_size=len(self.state_format['attrib']),
+            input_size=self.model_input_size,
             learning_rate=self.learning_rate
         )
 
@@ -147,12 +144,21 @@ class EvalWorker(mp.Process):
             self.reward_paths = eval_util.get_reward_paths(self.player_idx)
 
         self.target.eval()
+        # with torch.no_grad():
+        #     in_tensor = torch.ones(self.model_input_size).to(device)
+        #     out_tensor = self.model(in_tensor)
 
         # warm up model
+        stress_data = []
+        for n in range(0, self.frames_per_evaluation+1):
+            stress_data.append([[random.random() for n in range(0, self.model_input_size)]])
+
+        in_tensor = torch.Tensor([stress_data]).to(device)
+
+        # input data into model
         with torch.no_grad():
-            in_tensor = torch.ones(
-                (self.frames_per_evaluation * (len(self.state_format['attrib']) * 2)) + self.input_lookback).to(device)
-            out_tensor = self.model(in_tensor)
+            for i in range(0, in_tensor.size()[0]):
+                out_tensor, hidden_state = self.model(in_tensor[i])
 
     def round_cleanup(self, normalized_states, model_output):
         """
@@ -196,7 +202,8 @@ class EvalWorker(mp.Process):
             reaction_delay=self.reaction_delay,
             atk_preframes=config.settings['atk_preframes'],
             whiff_reward=config.settings['whiff_reward'],
-            reward_gamma=config.settings['reward_gamma']
+            reward_gamma=config.settings['reward_gamma'],
+            frames_per_observation=config.settings['p{}_model'.format(self.player_idx)]['frames_per_observation']
         )
         if config.settings['last_episode_only']:
             reward_sample = [reward_paths]
@@ -252,38 +259,34 @@ class EvalWorker(mp.Process):
                         last_normalized_index = last_normalized_index + 1
 
                         # if reaction time has passed, and we have enough frames to eval
-                        if (last_normalized_index - self.reaction_delay) >= last_evaluated_index:
+                        if (last_normalized_index - self.reaction_delay) > last_evaluated_index:
                             # create slice for evaluation
-                            evaluation_frames = normalized_states[:-self.reaction_delay]
+                            normalized_states = normalized_states
 
                             # flatten for input into model
                             flat_frames = []
 
-                            for f_idx in range(last_normalized_index - self.frames_per_evaluation,
-                                               last_normalized_index + 2):
+                            for f_idx in range(last_evaluated_index - self.frames_per_evaluation,
+                                               last_evaluated_index+1):
                                 if f_idx < 0:
                                     continue
                                 else:
                                     flat_frames.append(
-                                        evaluation_frames[f_idx]['game'] + [normalized_inputs[f_idx]])
+                                        normalized_states[f_idx]['game'] + [normalized_inputs[f_idx]])
 
                             if random.random() < eps_threshold:
                                 detached_out = torch.Tensor(np.random.rand(self.input_index_max + 1))
                                 max_q = None
                             else:
-
                                 # create tensor
                                 in_tensor = torch.Tensor(flat_frames).to(device)
 
                                 # input data into model
                                 with torch.no_grad():
-                                    hidden_state = torch.zeros(1, self.hidden_state_size).to(device)
+                                    out_tensor, hidden_state = self.model(in_tensor.unsqueeze(0))
 
-                                    for i in range(0, in_tensor.size()[0]):
-                                        out_tensor, hidden_state = self.model(in_tensor[i], hidden_state)
-
-                                detached_out = out_tensor.detach().cpu()
-                                max_q = torch.max(detached_out).numpy().item()
+                                detached_out = out_tensor[-1].detach().cpu()
+                                max_q = detached_out[-1].max().numpy().item()
                             try:
                                 action_index = torch.argmax(detached_out).numpy().item()
                                 eval_util.print_q(
@@ -307,15 +310,11 @@ class EvalWorker(mp.Process):
                                 'action_index': action_index,
                                 'output': list(detached_out.numpy()),
                                 'frame': self.frame_list[-1],
-                                'input': flat_frames,
+                                'input': flat_frames[-1],
                                 'states': len(self.states),
                                 'norm_states': len(normalized_states),
                                 'last_evaluated_index': last_evaluated_index,
                                 'last_normalized_index': last_normalized_index,
-                                'window': [
-                                    last_normalized_index - self.reaction_delay - self.frames_per_evaluation,
-                                    last_normalized_index - self.reaction_delay - 1
-                                ],
                                 "epsilon": self.epsilon
                             }
 

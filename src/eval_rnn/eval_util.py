@@ -29,7 +29,6 @@ def store_eval_output(normalized_states: list, states: list, model_output: list,
         states[idx]['input'] = states[idx]['input'][player_idx]
 
     all_data = {
-        "normalized_states": normalized_states,
         "states": copy.deepcopy(states),
         "model_output": copy.deepcopy(model_output),
         "state_format": state_format
