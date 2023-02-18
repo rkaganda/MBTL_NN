@@ -6,6 +6,7 @@ import torch.nn as nn
 import torch.utils.data as td
 from torch.autograd import Variable
 import torch.nn.functional as F
+from torch.utils.tensorboard import SummaryWriter
 
 import json
 
@@ -112,6 +113,7 @@ def train(model, target, optim, data):
 
 
 def train_model(reward_paths, stats_path, model, target, optim, epochs, episode_num, window_size):
+    writer = SummaryWriter(stats_path)
     reward_data = load_reward_data(reward_paths)
 
     criterion = nn.CrossEntropyLoss(reduction='none')
@@ -128,6 +130,8 @@ def train_model(reward_paths, stats_path, model, target, optim, epochs, episode_
     for epoch in tqdm(range(0, epochs)):
         for step, batch_data in enumerate(train_loader):
             train_loss, lr = train(model, target, optim, batch_data)
+            writer.add_scalar("Loss/train", train_loss, step)
+            writer.flush()
             stats[step] = {
                 "epoch": epoch,
                 "batch_size": len(batch_data[0]),
