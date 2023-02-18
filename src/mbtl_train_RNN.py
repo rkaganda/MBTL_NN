@@ -133,7 +133,7 @@ def capture_rounds(round_num: int):
     player_facing_flag = dict()
 
     # for each player
-    for p in range(0, 1):
+    for p in range(0, config.settings['player_count']):
         eval_statuses_[p] = manager.dict()  # share data across processes
         eval_statuses_[p]['kill_eval'] = False  # eval die
         eval_statuses_[p]['storing_eval'] = False  # eval storing data

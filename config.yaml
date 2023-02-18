@@ -1,5 +1,7 @@
 run_name: "rnn_double_dqn"
 
+player_count: 2
+
 p0_model:
   name: "arc_ddqn_test"
   frames_per_observation: 6

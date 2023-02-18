@@ -282,6 +282,7 @@ class EvalWorker(mp.Process):
                                 in_tensor = torch.Tensor(flat_frames).to(device)
 
                                 # input data into model
+                                self.model.eval()
                                 with torch.no_grad():
                                     out_tensor, hidden_state = self.model(in_tensor.unsqueeze(0))
 

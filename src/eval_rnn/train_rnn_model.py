@@ -44,6 +44,10 @@ def load_reward_data(reward_paths):
             file_dict = json.load(f)
         for k_, i_ in file_dict.items():
             full_data[k_] = full_data[k_] + i_
+        full_data['next_state'] = full_data['state'][1:]
+        full_data['next_state'].append([0.0] * len(full_data['next_state'][0]))
+        full_data['done'] = [0] * len(full_data['next_state'])
+        full_data['done'][-1] = 1
     return full_data
 
 
@@ -125,17 +129,9 @@ def train_model(reward_paths, stats_path, model, target, optim, epochs, episode_
 
     train_loader = torch.utils.data.DataLoader(dataset, sampler=sampler, batch_size=1)
 
-    stats = {}
+    for step, batch_data in tqdm(enumerate(train_loader)):
+        train_loss, lr = train(model, target, optim, batch_data)
+        writer.add_scalar("Loss/train", train_loss, step)
+        writer.flush()
 
-    for epoch in tqdm(range(0, epochs)):
-        for step, batch_data in enumerate(train_loader):
-            train_loss, lr = train(model, target, optim, batch_data)
-            writer.add_scalar("Loss/train", train_loss, step)
-            writer.flush()
-            stats[step] = {
-                "epoch": epoch,
-                "batch_size": len(batch_data[0]),
-                "loss": train_loss,
-                "learning rate": lr
-            }
 

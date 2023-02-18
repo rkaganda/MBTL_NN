@@ -195,7 +195,7 @@ def create_action_list(player_index: int) -> Tuple[list, int, int]:
         [0, 0, 1, 0],  # c
         [0, 0, 0, 1],  # d
         [1, 1, 0, 0],  # ab
-        [0, 1, 1, 0],  # ab
+        [0, 1, 1, 0],  # bc
         [1, 0, 0, 1]  # ac
     ]
 
