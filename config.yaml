@@ -1,16 +1,16 @@
-run_name: "rnn_test"
+run_name: "rnn_double_dqn"
 
 p0_model:
-  name: "p0_rnn_test"
+  name: "arc_ddqn_test"
   frames_per_observation: 6
   reaction_delay: 1
-  learning_rate: 1e-5
+  learning_rate: 1e-4
 
 p1_model:
-  name: "p0_rnn_test"
+  name: "shiki_ddqn_test"
   frames_per_observation: 6
   reaction_delay: 1
-  learning_rate: 1e-5
+  learning_rate: 1e-4
 
 
 data_path: "../data"

@@ -47,16 +47,20 @@ def load_reward_data(reward_paths):
 
 
 class RollingDataset(torch.utils.data.Dataset):
-    def __init__(self, states, actions, rewards, window):
+    def __init__(self, states, actions, rewards, next_states, done, window):
         self.states = torch.Tensor(states).to(device)
         self.actions = torch.Tensor(actions).to(device)
         self.rewards = torch.Tensor(rewards).to(device)
+        self.next_states = torch.Tensor(next_states).to(device)
+        self.done = torch.Tensor(done).to(device)
         self.window = window
 
     def __getitem__(self, index):
         return [self.states[index:index+self.window],
                 self.actions[index:index+self.window],
-                self.rewards[index:index+self.window]]
+                self.rewards[index:index+self.window],
+                self.next_states[index:index+self.window],
+                self.done[index:index+self.window]]
 
     def __len__(self):
         return len(self.states) - self.window
@@ -66,10 +70,14 @@ def create_dataset(data, window_size):
     state_tensor = data['state']
     action_tensor = data['action']
     reward_tensor = data['reward']
+    next_state_tensor = data['next_state']
+    done_tensor = data['done']
     dataset = RollingDataset(
         states=state_tensor,
         actions=action_tensor,
         rewards=reward_tensor,
+        next_states=next_state_tensor,
+        done=done_tensor,
         window=window_size)
 
     return dataset
@@ -77,24 +85,25 @@ def create_dataset(data, window_size):
 
 def train(model, target, optim, data):
     state = Variable(data[0])
-    actions = Variable(data[1])
-    rewards = Variable(data[2])
+    action = Variable(data[1])
+    reward = Variable(data[2])
+    next_state = Variable(data[3])
+    done = Variable(data[4])
 
     model.train()
     train_loss = 0
 
-    pred_q, _ = model(state)
-    better_q = pred_q.clone().scatter_(1, actions[0].to(torch.int64), rewards[0].unsqueeze(1))
+    with torch.no_grad():
+        next_q_values, _ = target(next_state)
+        next_q_values = next_q_values.max(dim=1)[0]
+        q_targets = reward + (1 - done) * next_q_values
 
-    # loss = F.smooth_l1_loss(pred_q, better_q).to(device)
-    criteron = nn.CrossEntropyLoss()
-    loss = criteron(pred_q, better_q.softmax(dim=1)).to(device)
+    q_values, _ = model(state)
+    q_values = q_values.gather(1, action[0].to(torch.int64)).squeeze(1)
 
+    loss = F.smooth_l1_loss(q_values, q_targets[0])
     optim.zero_grad()
     loss.backward()
-    for param in model.parameters():
-        param.grad.data.clamp_(-1, 1)
-        param.grad.to(device)
     optim.step()
 
     train_loss += loss.item()
@@ -104,14 +113,13 @@ def train(model, target, optim, data):
 
 def train_model(reward_paths, stats_path, model, target, optim, epochs, episode_num, window_size):
     reward_data = load_reward_data(reward_paths)
-    batch_size = config.settings['batch_size']
 
     criterion = nn.CrossEntropyLoss(reduction='none')
     criterion.to(device)
     model.to(device)
 
     dataset = create_dataset(reward_data, window_size)
-    sampler = torch.utils.data.SequentialSampler(dataset)
+    sampler = torch.utils.data.RandomSampler(dataset)
 
     train_loader = torch.utils.data.DataLoader(dataset, sampler=sampler, batch_size=1)
 
@@ -127,5 +135,3 @@ def train_model(reward_paths, stats_path, model, target, optim, epochs, episode_
                 "learning rate": lr
             }
 
-    with open("{}/{}.json".format(stats_path, episode_num), 'a') as f_writer:
-        f_writer.write(json.dumps(stats))
