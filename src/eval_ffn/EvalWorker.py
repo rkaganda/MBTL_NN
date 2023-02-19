@@ -11,11 +11,11 @@ import torch
 # import torch.multiprocessing as mp
 
 import melty_state
-import eval.model as model
-import eval.eval_util as eval_util
+import eval_ffn.model as model
+import eval_ffn.eval_util as eval_util
 import config
-import calc_reward
-from eval import train_dqn_model
+from eval_ffn import calc_reward
+from eval_ffn import train_dqn_model
 
 logging.basicConfig(filename='./logs/train.log', level=logging.DEBUG, format='%(asctime)s %(levelname)-8s %(message)s')
 logger = logging.getLogger(__name__)

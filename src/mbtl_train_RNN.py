@@ -19,8 +19,8 @@ import logging
 import config
 import mbtl_input
 import melty_state
-from eval_ffn.EvalWorker import EvalWorker
-import eval_ffn.model
+from eval_rnn.EvalWorker import EvalWorker
+import eval_rnn.model
 
 state_format = dict()
 state_format['directions'] = config.settings['directions']
@@ -133,7 +133,7 @@ def capture_rounds(round_num: int):
     player_facing_flag = dict()
 
     # for each player
-    for p in range(0, 2):
+    for p in range(0, config.settings['player_count']):
         eval_statuses_[p] = manager.dict()  # share data across processes
         eval_statuses_[p]['kill_eval'] = False  # eval die
         eval_statuses_[p]['storing_eval'] = False  # eval storing data
@@ -143,7 +143,7 @@ def capture_rounds(round_num: int):
         input_indices[p] = Value('i', neutral_action_index)  # current player action/input
         player_facing_flag[p] = Value('i', facing_flag)  # current player action/input
 
-        model_config = eval_ffn.model.load_model_config(p)
+        model_config = eval_rnn.model.load_model_config(p)
 
         # create worker for evaluation/training/reward
         eval_w = EvalWorker(
@@ -159,7 +159,6 @@ def capture_rounds(round_num: int):
             player_idx=p,
             frame_list=timer_log_,
             neutral_action_index=neutral_action_index,
-            input_lookback=model_config['input_lookback'],
             player_facing_flag=player_facing_flag[p]
         )
         eval_workers[p] = eval_w

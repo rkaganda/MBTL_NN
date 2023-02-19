@@ -35,35 +35,17 @@ def create_eval_df(file_dict: dict) -> pd.DataFrame:
     for frame_idx, (frame_key, frame_row) in enumerate(file_dict['model_output'].items()):
         row = dict()
         for row_idx, (key, item) in enumerate(frame_row.items()):
-            if isinstance(item, list):
-                for idx, value in enumerate(item):  # create a column for each list item
-                    row["{}_{}".format(key, idx)] = value
-            else:
-                row["{}".format(key)] = item
+            if key != 'state':
+                if isinstance(item, list):
+                    for idx, value in enumerate(item):  # create a column for each list item
+                        row["{}_{}".format(key, idx)] = value
+                else:
+                    row["{}".format(key)] = item
         d_[frame_idx] = row
 
     eval_df = pd.DataFrame.from_dict(d_, orient='index')
 
     return eval_df
-
-
-def create_norm_state_df(file_dict: dict) -> pd.DataFrame:
-    """
-    creates dataframe that contains the normalized action (called input) and game state for each frame
-    :param file_dict:
-    :return:
-    """
-    norm_dict = {}
-
-    for index, item in enumerate(file_dict['normalized_states']):
-        row = dict()
-        for idx, value in enumerate(item['input'] + item['game']):
-            row[idx] = value
-        norm_dict[index] = row
-
-    norm_state_df = pd.DataFrame.from_dict(norm_dict, orient='index')
-
-    return norm_state_df
 
 
 def calculate_actual_state_df(file_dict: dict) -> pd.DataFrame:
@@ -127,7 +109,7 @@ def create_eval_state_df(eval_df: pd.DataFrame, actual_state_df: pd.DataFrame) -
     eval_state_df = eval_df.merge(
         actual_state_df,
         how='left',
-        left_on='window_0',
+        left_on='last_evaluated_index',
         right_index=True
     )
 
@@ -152,18 +134,18 @@ def generate_diff(eval_state_df: pd.DataFrame, reward_columns: dict) -> pd.DataF
 def trim_reward_df(df: pd.DataFrame, reward_column: str, reaction_delay: int) -> pd.DataFrame:
     """
     remove all columns not needed to generate reward file
-    :param df:
+    :param eval_state_df:
     :param reward_column:
     :param reaction_delay:
     :return:
     """
-    state_columns = [c for c in df.columns if c.startswith('state')]
-    df = df[state_columns + [reward_column] + ['input']]
+    state_columns = [c for c in df.columns if c.startswith('input_')]
+    df = df[state_columns + [reward_column] + ['action_index']]
     df = df.rename(columns={reward_column: "reward"})
 
     df = df[:-1]
 
-    # z-score
+    # df['reward'] = (df['reward'] - 242.558952) / 758.366903
     df['reward'] = df['reward'] / 4000
     df['reward'] = df['reward'].shift(-reaction_delay)
 
@@ -180,11 +162,13 @@ def calculate_reward_from_eval(
         reaction_delay: int,
         atk_preframes: int,
         whiff_reward: float,
+        frames_per_observation: int,
         reward_gamma: float
 ) -> pd.DataFrame:
     """
     Generate a json reward file from an eval json file
 
+    :param frames_per_observation:
     :param file_path: the file path of the json eval file
     :param reward_columns: dict containing the actual state columns used to generate reward
     :param falloff: old gamma, not used
@@ -197,7 +181,6 @@ def calculate_reward_from_eval(
     """
     file_dict = load_file(file_path)  # load the eval file
     eval_df = create_eval_df(file_dict)  # contains the eval each frame as a row
-    norm_state_df = create_norm_state_df(file_dict)  # contains normalize state for each frame
     actual_state_df = calculate_actual_state_df(file_dict)  # contains actual state for each frame
 
     eval_state_df = create_eval_state_df(  # actual state, norm state, eval info
@@ -216,9 +199,6 @@ def calculate_reward_from_eval(
     # apply reward discounts
     eval_state_df = apply_reward_discount(eval_state_df, reward_gamma)
 
-    # remove rewards during hit state
-    eval_state_df = remove_rewards_during_hit(eval_state_df)
-
     # trim full df down to just state, action, reward
     output_with_input_and_reward = trim_reward_df(eval_state_df, 'actual_reward', reaction_delay)
 
@@ -234,23 +214,7 @@ def apply_reward_discount(df, discount_factor):
         discounted_rewards.append(cumulative_reward)
     discounted_rewards = discounted_rewards[::-1]
     df['discounted_reward'] = discounted_rewards
-    # df['actual_reward'] = df.apply(lambda x: x['reward'] if abs(x['reward']) > abs(x['discounted_reward']) else x['discounted_reward'], axis=1)
     df['actual_reward'] = df['discounted_reward']
-
-    return df
-
-
-def remove_rewards_during_hit(df: pd.DataFrame):
-    """
-        removes reward data when player is being hit as meaningful actions can be preformed during this time
-        if enemy player is not hit during the player atk frames
-        :param df: the game state, each row is a frame
-        """
-    p_idx = 0
-    hit_col = 'p_{}_hit'.format(p_idx)
-
-    df = df[df[hit_col] == 0]
-    # df = df[df['actual_reward'] != 0]
 
     return df
 
@@ -379,8 +343,9 @@ def generate_json_from_in_out_df(output_with_input_and_reward: pd.DataFrame):
     """
     json_dict = {}
 
-    state_columns = [c for c in output_with_input_and_reward.columns if c.startswith('state_')]
-    action_columns = [c for c in output_with_input_and_reward.columns if c.startswith('input')]
+    state_columns = [c for c in output_with_input_and_reward.columns if c.startswith('input_')]
+    action_columns = [c for c in output_with_input_and_reward.columns if c.startswith('action_index')]
+
     json_dict['state'] = output_with_input_and_reward[state_columns].values.tolist()
     json_dict['reward'] = output_with_input_and_reward['reward'].values.tolist()
     json_dict['action'] = output_with_input_and_reward[action_columns].values.tolist()
@@ -389,7 +354,7 @@ def generate_json_from_in_out_df(output_with_input_and_reward: pd.DataFrame):
 
 
 def generate_rewards(eval_path: str, reward_path: str, reward_columns: dict, falloff: int, player_idx: int,
-                     reaction_delay: int, atk_preframes: int, whiff_reward: float,
+                     reaction_delay: int, atk_preframes: int, whiff_reward: float, frames_per_observation: int,
                      reward_gamma: int) -> str:
     """
     loads all the eval files contained in the eval path and generates a reward file for each
@@ -401,6 +366,7 @@ def generate_rewards(eval_path: str, reward_path: str, reward_columns: dict, fal
     :param reaction_delay:
     :param atk_preframes:
     :param whiff_reward:
+    :param frames_per_observation:
     :param reward_gamma:
     :return: path to new reward file
     """
@@ -418,10 +384,12 @@ def generate_rewards(eval_path: str, reward_path: str, reward_columns: dict, fal
                     reward_columns=reward_columns,
                     falloff=falloff, player_idx=player_idx,
                     reaction_delay=reaction_delay,
+                    frames_per_observation=frames_per_observation,
                     atk_preframes=atk_preframes,
                     whiff_reward=whiff_reward,
                     reward_gamma=reward_gamma)
-                file_json = generate_json_from_in_out_df(df)
+                file_json = generate_json_from_in_out_df(
+                    output_with_input_and_reward=df)
 
                 with open("{}/{}".format(reward_path, reward_file), 'w') as f_writer:
                     f_writer.write(json.dumps(file_json))
