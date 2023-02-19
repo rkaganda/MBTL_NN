@@ -291,7 +291,7 @@ class EvalWorker(mp.Process):
                                 if config.settings['probability_action']:
                                     if detached_out.min() < 0:
                                         detached_out = detached_out - detached_out.min()
-                                    action_index = torch.multinomial(detached_out, 1)
+                                    action_index = torch.multinomial(detached_out, 1).numpy().item()
                                 else:
                                     action_index = torch.argmax(detached_out).numpy().item()
                             try:

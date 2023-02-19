@@ -129,9 +129,11 @@ def train_model(reward_paths, stats_path, model, target, optim, epochs, episode_
 
     train_loader = torch.utils.data.DataLoader(dataset, sampler=sampler, batch_size=1)
 
-    for step, batch_data in tqdm(enumerate(train_loader)):
+    eps_loss = 0
+    for step, batch_data in tqdm(enumerate(train_loader), total=len(reward_data)):
         train_loss, lr = train(model, target, optim, batch_data)
-        writer.add_scalar("Loss/train", train_loss, step)
-        writer.flush()
+        eps_loss = eps_loss + train_loss
+    writer.add_scalar("Loss/train", eps_loss/len(reward_data), episode_num)
+    writer.flush()
 
 
