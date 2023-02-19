@@ -277,6 +277,7 @@ class EvalWorker(mp.Process):
                             if random.random() < eps_threshold:
                                 detached_out = torch.Tensor(np.random.rand(self.input_index_max + 1))
                                 max_q = None
+                                action_index = torch.argmax(detached_out).numpy().item()
                             else:
                                 # create tensor
                                 in_tensor = torch.Tensor(flat_frames).to(device)
@@ -287,9 +288,15 @@ class EvalWorker(mp.Process):
                                     out_tensor, hidden_state = self.model(in_tensor.unsqueeze(0))
 
                                 detached_out = out_tensor[-1].detach().cpu()
-                                max_q = detached_out[-1].max().numpy().item()
+                                if config.settings['probability_action']:
+                                    if detached_out.min() < 0:
+                                        detached_out = detached_out - detached_out.min()
+                                    action_index = torch.multinomial(detached_out, 1)
+                                else:
+                                    action_index = torch.argmax(detached_out).numpy().item()
                             try:
-                                action_index = torch.argmax(detached_out).numpy().item()
+                                max_q = detached_out[-1].max().numpy().item()
+
                                 eval_util.print_q(
                                     cur_frame=len(self.states)-1,
                                     eval_frame=last_normalized_index,
