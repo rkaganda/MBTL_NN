@@ -357,6 +357,7 @@ def calculate_pred_q_error(_df: pd.DataFrame, stats_path: str, episode_num):
         for col in ['mean','count','std']:
             if col in stat.index:
                 writer.add_scalar("{}/{}".format(label,col), stat.loc[col], episode_num)
+    writer.add_scalar("train/reward", _df['p_1_health_diff'].sum()/len(_df['p_1_health_diff']), episode_num)
     writer.flush()
 
 

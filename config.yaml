@@ -16,7 +16,7 @@ p1_model:
 
 
 data_path: "../data"
-minmax_file: "reduced_minmax.json"
+minmax_file: "less_minmax.json"
 count_save: 1
 
 # explore
@@ -46,7 +46,7 @@ episode_sample_size: 1
 last_episode_only: False
 batch_size: 512
 epochs: 1
-tau: 20
+tau: 50
 
 # inputs
 directions:
