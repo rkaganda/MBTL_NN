@@ -5,6 +5,8 @@ from os.path import isfile, join
 from pathlib import Path
 import logging
 import itertools
+from torch.utils.tensorboard import SummaryWriter
+
 
 logging.basicConfig(filename='../logs/train.log', level=logging.DEBUG, format='%(asctime)s %(levelname)-8s %(message)s')
 logger = logging.getLogger(__name__)
@@ -163,11 +165,15 @@ def calculate_reward_from_eval(
         atk_preframes: int,
         whiff_reward: float,
         frames_per_observation: int,
-        reward_gamma: float
+        reward_gamma: float,
+        stats_path: str,
+        episode_number: int
 ) -> pd.DataFrame:
     """
     Generate a json reward file from an eval json file
 
+    :param episode_number:
+    :param stats_path:
     :param frames_per_observation:
     :param file_path: the file path of the json eval file
     :param reward_columns: dict containing the actual state columns used to generate reward
@@ -198,6 +204,8 @@ def calculate_reward_from_eval(
 
     # apply reward discounts
     eval_state_df = apply_reward_discount(eval_state_df, reward_gamma)
+
+    calculate_pred_q_error(eval_state_df, stats_path, episode_number)
 
     # trim full df down to just state, action, reward
     output_with_input_and_reward = trim_reward_df(eval_state_df, 'actual_reward', reaction_delay)
@@ -335,6 +343,21 @@ def apply_negative_motion_type_reward(df: pd.DataFrame, atk_preframes: int, whif
     return df
 
 
+def calculate_pred_q_error(_df: pd.DataFrame, stats_path: str, episode_num):
+    writer = SummaryWriter(stats_path)
+
+    df = _df[['actual_reward','pred_q']].copy()
+    df['actual_reward'] = df['actual_reward'] / 4000
+    df['pred_q_error'] = df['actual_reward'] - df['pred_q']
+    over_estimated_pred_q = df[df['actual_reward'] < df['pred_q']]['pred_q_error'].describe()
+    under_estimated_pred_q = df[df['actual_reward'] > df['pred_q']]['pred_q_error'].describe()
+    for label, stat in zip(['over_estimated_pred_q', 'under_estimated_pred_q', 'total_pred_q_error'], [over_estimated_pred_q, under_estimated_pred_q, df['pred_q_error'].describe()]):
+        for col in ['mean','count','std']:
+            writer.add_scalar("{}/{}".format(label,col), stat.loc[col], episode_num)
+
+    writer.flush()
+
+
 def generate_json_from_in_out_df(output_with_input_and_reward: pd.DataFrame):
     """
     creates reward json from reward dataframe
@@ -355,9 +378,11 @@ def generate_json_from_in_out_df(output_with_input_and_reward: pd.DataFrame):
 
 def generate_rewards(eval_path: str, reward_path: str, reward_columns: dict, falloff: int, player_idx: int,
                      reaction_delay: int, atk_preframes: int, whiff_reward: float, frames_per_observation: int,
-                     reward_gamma: int) -> str:
+                     reward_gamma: int, stats_path: str, episode_number: int) -> str:
     """
     loads all the eval files contained in the eval path and generates a reward file for each
+    :param episode_number:
+    :param stats_path:
     :param eval_path:
     :param reward_path:
     :param reward_columns: state column name and scaling used to calculate reward
@@ -387,7 +412,10 @@ def generate_rewards(eval_path: str, reward_path: str, reward_columns: dict, fal
                     frames_per_observation=frames_per_observation,
                     atk_preframes=atk_preframes,
                     whiff_reward=whiff_reward,
-                    reward_gamma=reward_gamma)
+                    reward_gamma=reward_gamma,
+                    stats_path=stats_path,
+                    episode_number=episode_number
+                )
                 file_json = generate_json_from_in_out_df(
                     output_with_input_and_reward=df)
 

@@ -203,7 +203,9 @@ class EvalWorker(mp.Process):
             atk_preframes=config.settings['atk_preframes'],
             whiff_reward=config.settings['whiff_reward'],
             reward_gamma=config.settings['reward_gamma'],
-            frames_per_observation=config.settings['p{}_model'.format(self.player_idx)]['frames_per_observation']
+            frames_per_observation=config.settings['p{}_model'.format(self.player_idx)]['frames_per_observation'],
+            stats_path=stats_path,
+            episode_number=self.episode_number
         )
         if config.settings['last_episode_only']:
             reward_sample = [reward_paths]

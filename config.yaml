@@ -1,9 +1,9 @@
-run_name: "rnn_double_dqn"
+run_name: "shiki_shiki_cpu"
 
-player_count: 2
+player_count: 1
 
 p0_model:
-  name: "arc_ddqn_test"
+  name: "shiki_shiki_cpu"
   frames_per_observation: 10
   reaction_delay: 1
   learning_rate: 1e-4
@@ -20,9 +20,9 @@ minmax_file: "reduced_minmax.json"
 count_save: 1
 
 # explore
-probability_action: True
+probability_action: False
 final_epsilon:  0
-initial_epsilon: 0
+initial_epsilon: 1
 epsilon_decay: 100
 no_explore_limit: 10
 eps_explore_threshold: -1

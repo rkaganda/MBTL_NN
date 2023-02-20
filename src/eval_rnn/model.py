@@ -27,7 +27,7 @@ class Model(nn.Module):
 
         # layers
         # rn
-        self.rnn = nn.RNN(input_size, hidden_dim, num_layers, batch_first=True)
+        self.rnn = nn.GRU(input_size, hidden_dim, num_layers, batch_first=True)
         # fc layer
         self.fc = nn.Linear(hidden_dim, output_size)
 
@@ -57,8 +57,8 @@ def setup_model(input_size, actions_size, learning_rate):
     model = Model(
         input_size=input_size,
         output_size=actions_size,
-        hidden_dim=input_size,
-        num_layers=2
+        hidden_dim=input_size*2,
+        num_layers=3
     )
     model.share_memory()
 
