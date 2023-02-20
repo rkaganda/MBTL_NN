@@ -29,7 +29,7 @@ eps_explore_threshold: -1
 
 
 # reward
-reward_gamma: .95
+reward_gamma: .8
 atk_preframes: 3
 whiff_reward: -1000
 reward_columns:
