@@ -349,12 +349,14 @@ def calculate_pred_q_error(_df: pd.DataFrame, stats_path: str, episode_num):
     df = _df[['actual_reward','pred_q']].copy()
     df['actual_reward'] = df['actual_reward'] / 4000
     df['pred_q_error'] = df['actual_reward'] - df['pred_q']
+    df[['pred_q']] = df[['pred_q']].fillna(value=0)
+
     over_estimated_pred_q = df[df['actual_reward'] < df['pred_q']]['pred_q_error'].describe()
     under_estimated_pred_q = df[df['actual_reward'] > df['pred_q']]['pred_q_error'].describe()
     for label, stat in zip(['over_estimated_pred_q', 'under_estimated_pred_q', 'total_pred_q_error'], [over_estimated_pred_q, under_estimated_pred_q, df['pred_q_error'].describe()]):
         for col in ['mean','count','std']:
-            writer.add_scalar("{}/{}".format(label,col), stat.loc[col], episode_num)
-
+            if col in stat.index:
+                writer.add_scalar("{}/{}".format(label,col), stat.loc[col], episode_num)
     writer.flush()
 
 

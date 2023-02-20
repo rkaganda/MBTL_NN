@@ -20,9 +20,9 @@ minmax_file: "reduced_minmax.json"
 count_save: 1
 
 # explore
-probability_action: true
+probability_action: false
 final_epsilon:  0
-initial_epsilon: 0
+initial_epsilon: 1
 epsilon_decay: 100
 no_explore_limit: 10
 eps_explore_threshold: -1
