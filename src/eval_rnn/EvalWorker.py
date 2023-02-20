@@ -291,14 +291,15 @@ class EvalWorker(mp.Process):
 
                                 detached_out = out_tensor[-1].detach().cpu()
                                 if config.settings['probability_action']:
-                                    if detached_out.min() < 0:
-                                        detached_out = detached_out - detached_out.min()
-                                    action_index = torch.multinomial(detached_out, 1).numpy().item()
+                                    out_clone = detached_out.clone()
+                                    if out_clone.min() < 0:
+                                        out_clone = out_clone - out_clone.min()
+                                    action_index = torch.multinomial(out_clone, 1).numpy().item()
+                                    max_q = detached_out[action_index].numpy().item()
                                 else:
                                     action_index = torch.argmax(detached_out).numpy().item()
+                                    max_q = detached_out[-1].max().numpy().item()
                             try:
-                                max_q = detached_out[-1].max().numpy().item()
-
                                 eval_util.print_q(
                                     cur_frame=len(self.states)-1,
                                     eval_frame=last_normalized_index,
