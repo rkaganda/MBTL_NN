@@ -57,8 +57,8 @@ def setup_model(input_size, actions_size, learning_rate):
     model = Model(
         input_size=input_size,
         output_size=actions_size,
-        hidden_dim=input_size*2,
-        num_layers=3
+        hidden_dim=input_size,
+        num_layers=2
     )
     model.share_memory()
 

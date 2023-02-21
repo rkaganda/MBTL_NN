@@ -149,7 +149,7 @@ def trim_reward_df(df: pd.DataFrame, reward_column: str, reaction_delay: int) ->
 
     # df['reward'] = (df['reward'] - 242.558952) / 758.366903
     df['reward'] = df['reward'] / 4000
-    df['reward'] = df['reward'].shift(-reaction_delay)
+    df['reward'] = df['reward'].shift(-(reaction_delay+1))
 
     df = df.dropna()
 

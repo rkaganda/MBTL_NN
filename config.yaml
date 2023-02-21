@@ -1,9 +1,9 @@
-run_name: "shiki_shiki_cpu"
+run_name: "reduced_reward_test"
 
 player_count: 1
 
 p0_model:
-  name: "shiki_shiki_cpu"
+  name: "reduced_reward_test_p0iusoduwdi"
   frames_per_observation: 10
   reaction_delay: 1
   learning_rate: 1e-4
@@ -29,8 +29,8 @@ eps_explore_threshold: -1
 
 
 # reward
-reward_gamma: .8
-atk_preframes: 3
+reward_gamma: .75
+atk_preframes: 2
 whiff_reward: -1000
 reward_columns:
   0:
