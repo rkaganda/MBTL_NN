@@ -93,9 +93,10 @@ def get_next_episode(player_idx):
 
 
 def print_q(cur_frame, eval_frame, action, q):
-    sys.stdout.write("\r cur_frame={}, eval_frame={}, action= {} est_Q= {}".format(
-        str(cur_frame).ljust(4),
-        str(eval_frame).ljust(4),
-        str(action).ljust(3),
-        str(q).ljust(5)))
-    sys.stdout.flush()
+    pass
+    # sys.stdout.write("\r cur_frame={}, eval_frame={}, action= {} est_Q= {}".format(
+    #     str(cur_frame).ljust(4),
+    #     str(eval_frame).ljust(4),
+    #     str(action).ljust(3),
+    #     str(q).ljust(5)))
+    # sys.stdout.flush()

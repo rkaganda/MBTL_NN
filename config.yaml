@@ -1,15 +1,17 @@
-run_name: "reduced_reward_test"
+run_name: "state_capture"
 
-player_count: 1
+player_count: 2
 
 p0_model:
-  name: "reduced_reward_test_p0iusoduwdi"
+  name: "arc_state_capture"
+  character: "arc"
   frames_per_observation: 10
   reaction_delay: 1
   learning_rate: 1e-4
 
 p1_model:
-  name: "shiki_ddqn_test"
+  name: "shiki_state_capture"
+  character: "shiki"
   frames_per_observation: 10
   reaction_delay: 1
   learning_rate: 1e-4

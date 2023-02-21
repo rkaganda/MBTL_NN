@@ -21,6 +21,7 @@ import mbtl_input
 import melty_state
 from eval_rnn.EvalWorker import EvalWorker
 import eval_rnn.model
+from state_img_capture import StateImageCapture
 
 state_format = dict()
 state_format['directions'] = config.settings['directions']
@@ -48,6 +49,7 @@ def get_state_data(cfg: cfg_tl) -> dict:
 
 
 def monitor_state(game_states, input_indices, timer_log, env_status, eval_statuses, timer_max):
+    state_cap = StateImageCapture(game_states)
     cfg = cfg_tl
     sub = sub_tl
 
@@ -65,6 +67,7 @@ def monitor_state(game_states, input_indices, timer_log, env_status, eval_status
     timer = cfg.game_data.timer.r_mem()
     data_index = 0
     round_reset = False
+    states_stored = False
 
     while not env_status['die']:
         time.sleep(0.001)
@@ -93,6 +96,7 @@ def monitor_state(game_states, input_indices, timer_log, env_status, eval_status
                         env_status['round_done'] = True
                         for _, eval_status in eval_statuses.items():
                             eval_status['eval_ready'] = False
+                        state_cap.store_new_states()
                         round_reset = False
                         print("round done.. stopping eval")
                         break
@@ -101,7 +105,7 @@ def monitor_state(game_states, input_indices, timer_log, env_status, eval_status
                         'game': get_state_data(cfg),
                         'input': [v.value for _, v in input_indices.items()]
                     })
-
+                    state_cap.capture_new_states(timer)
                     timer_old = timer  # store last time data was logged
                     time.sleep(0.004)  # データが安定するまで待機 # Wait for data to stabilize
 
@@ -227,4 +231,4 @@ def capture_rounds(round_num: int):
 
 if __name__ == "__main__":
     mp.set_start_method('spawn')
-    capture_rounds(1000)
+    capture_rounds(5)
