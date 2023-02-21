@@ -238,6 +238,11 @@ class EvalWorker(mp.Process):
             eps_threshold = initial_epsilon
             esp_count = 0
             no_explore_count = 0
+            explore_better_action = False
+
+            if config.settings['probability_action'] and no_explore_count >= config.settings['no_explore_limit']:
+                explore_better_action = True
+                print("explore_better_action={}".format(explore_better_action))
 
             self.eval_status['eval_ready'] = True  # eval is ready
             while not self.eval_status['kill_eval']:
@@ -290,7 +295,7 @@ class EvalWorker(mp.Process):
                                     out_tensor, hidden_state = self.model(in_tensor.unsqueeze(0))
 
                                 detached_out = out_tensor[-1].detach().cpu()
-                                if config.settings['probability_action']:
+                                if explore_better_action and detached_out[-1].max() < 0:
                                     out_clone = detached_out.clone()
                                     if out_clone.min() < 0:
                                         out_clone = out_clone - out_clone.min()
@@ -341,11 +346,16 @@ class EvalWorker(mp.Process):
                     if eps_threshold <= config.settings['eps_explore_threshold']:
                         no_explore_count = no_explore_count + 1
 
-                    if no_explore_count >= config.settings['no_explore_limit']:
+                    if no_explore_count >= config.settings['explore_reset']:
                         esp_count = 0
                         no_explore_count = 0
+                        explore_better_action = False
                     else:
                         esp_count = esp_count + 1
+
+                    if config.settings['probability_action'] and no_explore_count >= config.settings['no_explore_limit']:
+                        explore_better_action = True
+                        print("explore_better_action={}".format(explore_better_action))
 
                     self.epsilon = round(eps_threshold, 2)
                     print("eps={} no_explore={}".format(self.epsilon, no_explore_count))
