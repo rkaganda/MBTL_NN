@@ -47,7 +47,7 @@ episode_sample_size: 1
 last_episode_only: False
 batch_size: 512
 epochs: 1
-tau: 50
+tau: 5
 
 # inputs
 directions:
