@@ -280,7 +280,14 @@ class EvalWorker(mp.Process):
                                 else:
                                     flat_frames.append(
                                         normalized_states[f_idx]['game'] + [normalized_inputs[f_idx]])
-                            act_sequence = [8 ,0, 24 ,26 ,self.neutral_action_index,self.neutral_action_index,self.neutral_action_index]
+                            act_sequence = [8, 0, 24, 26,
+                                            self.neutral_action_index,
+                                            self.neutral_action_index,
+                                            self.neutral_action_index,
+                                            self.neutral_action_index,
+                                            self.neutral_action_index,
+                                            self.neutral_action_index
+                                            ]
                             if random.random() < eps_threshold:
                                 detached_out = torch.Tensor(np.random.rand(self.input_index_max + 1))
                                 max_q = None

@@ -20,9 +20,9 @@ minmax_file: "less_minmax.json"
 count_save: 1
 
 # explore
-probability_action: true
+probability_action: false
 final_epsilon:  0
-initial_epsilon: 1
+initial_epsilon: 0
 epsilon_decay: 1
 no_explore_limit: 0
 explore_reset: 10
@@ -67,7 +67,7 @@ buttons:
   - "c"
   - "d"
 
-timer_max: 5000
+timer_max: 2000
 
 log_level: DEBUG
 

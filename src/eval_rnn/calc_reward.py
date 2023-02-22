@@ -72,32 +72,6 @@ def calculate_actual_state_df(file_dict: dict) -> pd.DataFrame:
     return actual_state_df
 
 
-def calculate_reformed_input_df(eval_df: pd.DataFrame, norm_state_df: pd.DataFrame) -> pd.DataFrame:
-    """
-    merge the eval and normalized state dataframes such that each row represent an evaluation frame
-
-    :param eval_df:
-    :param norm_state_df:
-    :return:
-    """
-    input_windows = list()
-    for idx, row in eval_df.iterrows():
-        input_window = list()
-        # the model evaluates multiple frames of data each frame
-        # window_0 and window_1 are index of the start and end frames of data for that evaluation frame
-        for idx in range(int(row['window_0']), int(row['window_1']) + 1):
-            input_window = input_window + norm_state_df.iloc[idx].to_list()
-        input_windows.append(input_window)
-
-    reformed_input_df = pd.DataFrame(input_windows)
-    reformed_input_df.index = list(reformed_input_df.index)
-    reformed_input_df.columns = list(reformed_input_df.columns)
-    reformed_input_df.columns = reformed_input_df.columns.map(str)
-    reformed_input_df = reformed_input_df.add_prefix("state_")
-
-    return reformed_input_df
-
-
 def create_eval_state_df(eval_df: pd.DataFrame, actual_state_df: pd.DataFrame) -> pd.DataFrame:
     """
     merge all the dataframes together so that a single row contains
@@ -147,7 +121,6 @@ def trim_reward_df(df: pd.DataFrame, reward_column: str, reaction_delay: int) ->
 
     df = df[:-1]
 
-    df['reward'] = df['reward']
     df['reward'] = df['reward'].shift(-(reaction_delay+1))
 
     df = df.dropna()
@@ -264,16 +237,13 @@ def apply_motion_type_reward(df: pd.DataFrame, atk_preframes: int, whiff_reward:
         hit_motion_segments.append(hit_motion_start)
 
     reward_value = 1
+
     # apply reward for each motion seg
     for hs in motion_type_segment:
         reward_start = hs[0]
         reward_end = hs[0] + 1
         if df.loc[hs[0], 'p_0_motion_type'] == 231:
-            df.loc[(df.index >= reward_start) & (df.index < reward_end), 'reward'] = \
-                df.loc[(df.index >= reward_start) & (df.index < reward_end), 'reward'] + reward_value  # apply reward
-        elif df.loc[hs[0], 'p_0_motion_type'] != 0:
-            df.loc[(df.index >= reward_start) & (df.index < reward_end), 'reward'] = \
-                df.loc[(df.index >= reward_start) & (df.index < reward_end), 'reward'] - reward_value  # apply reward
+            df.loc[(df.index >= reward_start) & (df.index < reward_end), 'reward'] = reward_value  # apply reward
 
     return df
 
