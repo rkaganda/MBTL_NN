@@ -120,9 +120,6 @@ def trim_reward_df(df: pd.DataFrame, reward_column: str, reaction_delay: int) ->
     df = df.rename(columns={reward_column: "reward"})
 
     df = df[:-1]
-
-    df['reward'] = df['reward'].shift(-(reaction_delay+1))
-
     df = df.dropna()
 
     return df
@@ -237,11 +234,10 @@ def apply_motion_type_reward(df: pd.DataFrame, atk_preframes: int, whiff_reward:
         hit_motion_segments.append(hit_motion_start)
 
     reward_value = 1
-
     # apply reward for each motion seg
     for hs in motion_type_segment:
-        reward_start = hs[0]
-        reward_end = hs[0] + 1
+        reward_start = hs[0] - 1
+        reward_end = hs[0]
         if df.loc[hs[0], 'p_0_motion_type'] == 231:
             df.loc[(df.index >= reward_start) & (df.index < reward_end), 'reward'] = reward_value  # apply reward
 
