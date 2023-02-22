@@ -188,8 +188,8 @@ class EvalWorker(mp.Process):
                                                        self.episode_number)
         eval_path = "{}/eval/{}/evals/{}/{}".format(config.settings['data_path'], config.settings['run_name'],
                                                     self.player_idx, self.episode_number)
-        stats_path = "{}/runs/{}".format(config.settings['data_path'], config.settings['run_name'],
-                                                  self.player_idx)
+        stats_path = "{}/runs/{}".format(
+            config.settings['data_path'], config.settings["p{}_model".format(self.player_idx)]["name"])
         reward_paths = calc_reward.generate_rewards(
             reward_path=reward_path,
             eval_path=eval_path,

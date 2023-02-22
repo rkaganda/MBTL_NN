@@ -1,9 +1,9 @@
-run_name: "reduced_reward_test"
+run_name: "force_ability"
 
 player_count: 1
 
 p0_model:
-  name: "reduced_reward_test_p0iusoduwdi"
+  name: "shiki_231"
   frames_per_observation: 10
   reaction_delay: 1
   learning_rate: 1e-4
@@ -22,17 +22,17 @@ count_save: 1
 # explore
 probability_action: true
 final_epsilon:  0
-initial_epsilon: 0
-epsilon_decay: 100
+initial_epsilon: 1
+epsilon_decay: 1
 no_explore_limit: 0
-explore_reset: 1000
-eps_explore_threshold: 0
+explore_reset: 10
+eps_explore_threshold: .01
 
 
 # reward
-reward_gamma: .75
-atk_preframes: 2
-whiff_reward: -1000
+reward_gamma: .5
+atk_preframes: 1
+whiff_reward: 0
 reward_columns:
   0:
     "p_0_health": 1
@@ -67,7 +67,7 @@ buttons:
   - "c"
   - "d"
 
-timer_max: 9999999
+timer_max: 5000
 
 log_level: DEBUG
 
