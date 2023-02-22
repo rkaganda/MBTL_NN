@@ -64,7 +64,7 @@ def calculate_actual_state_df(file_dict: dict) -> pd.DataFrame:
             for attrib, value in player_states.items():
                 row["p_{}_{}".format(player_id, attrib)] = value
 
-        row["input"] = item['input']
+        row["p_input"] = item['input']
         actual_state_dict[index] = row
 
     actual_state_df = pd.DataFrame.from_dict(actual_state_dict, orient='index')
@@ -107,7 +107,7 @@ def generate_diff(eval_state_df: pd.DataFrame, reward_columns: dict) -> pd.DataF
     return eval_state_df
 
 
-def trim_reward_df(df: pd.DataFrame, reward_column: str, reaction_delay: int) -> pd.DataFrame:
+def trim_reward_df(df: pd.DataFrame, reward_column: str) -> pd.DataFrame:
     """
     remove all columns not needed to generate reward file
     :param eval_state_df:
@@ -116,7 +116,7 @@ def trim_reward_df(df: pd.DataFrame, reward_column: str, reaction_delay: int) ->
     :return:
     """
     state_columns = [c for c in df.columns if c.startswith('input_')]
-    df = df[state_columns + [reward_column] + ['action_index']]
+    df = df[state_columns + [reward_column] + ['p_input']]
     df = df.rename(columns={reward_column: "reward"})
 
     df = df[:-1]
@@ -174,7 +174,7 @@ def calculate_reward_from_eval(
     calculate_pred_q_error(eval_state_df, stats_path, episode_number)
 
     # trim full df down to just state, action, reward
-    output_with_input_and_reward = trim_reward_df(eval_state_df, 'actual_reward', reaction_delay)
+    output_with_input_and_reward = trim_reward_df(eval_state_df, 'actual_reward')
 
     return output_with_input_and_reward
 
@@ -236,9 +236,10 @@ def apply_motion_type_reward(df: pd.DataFrame, atk_preframes: int, whiff_reward:
     reward_value = 1
     # apply reward for each motion seg
     for hs in motion_type_segment:
-        reward_start = hs[0] - 1
-        reward_end = hs[0]
+        reward_start = hs[0] - 2
+        reward_end = hs[0] - 1
         if df.loc[hs[0], 'p_0_motion_type'] == 231:
+            logger.debug("321 {} {}".format(reward_start, reward_end))
             df.loc[(df.index >= reward_start) & (df.index < reward_end), 'reward'] = reward_value  # apply reward
 
     return df
@@ -248,7 +249,7 @@ def calculate_pred_q_error(_df: pd.DataFrame, stats_path: str, episode_num):
     writer = SummaryWriter(stats_path)
 
     df = _df[['actual_reward','pred_q']].copy()
-    df['actual_reward'] = df['actual_reward'] / 4000
+    df['actual_reward'] = df['actual_reward']
     df['pred_q_error'] = df['actual_reward'] - df['pred_q']
     df[['pred_q']] = df[['pred_q']].fillna(value=0)
 
@@ -271,7 +272,7 @@ def generate_json_from_in_out_df(output_with_input_and_reward: pd.DataFrame):
     json_dict = {}
 
     state_columns = [c for c in output_with_input_and_reward.columns if c.startswith('input_')]
-    action_columns = [c for c in output_with_input_and_reward.columns if c.startswith('action_index')]
+    action_columns = [c for c in output_with_input_and_reward.columns if c.startswith('p_input')]
 
     json_dict['state'] = output_with_input_and_reward[state_columns].values.tolist()
     json_dict['reward'] = output_with_input_and_reward['reward'].values.tolist()
