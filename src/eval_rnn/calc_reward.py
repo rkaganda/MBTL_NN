@@ -239,7 +239,6 @@ def apply_motion_type_reward(df: pd.DataFrame, atk_preframes: int, whiff_reward:
         reward_start = hs[0] - 2
         reward_end = hs[0] - 1
         if df.loc[hs[0], 'p_0_motion_type'] == 231:
-            logger.debug("321 {} {}".format(reward_start, reward_end))
             df.loc[(df.index >= reward_start) & (df.index < reward_end), 'reward'] = reward_value  # apply reward
 
     return df
