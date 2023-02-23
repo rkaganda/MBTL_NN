@@ -30,6 +30,14 @@ def get_attributes():
     return state_format['attrib'], state_format['game_attrib']
 
 
+def get_categories():
+    return copy.deepcopy(state_format['categories']), copy.deepcopy(state_format['categorical'])
+
+
+def get_values():
+    return copy.deepcopy(state_format['values'])
+
+
 def encode_relative_states(game_state, player_idx):
     player_facing_flag = 1
 
@@ -54,3 +62,5 @@ def encode_relative_states(game_state, player_idx):
         rel_state = {1: game_state[1], 0: game_state[0]}
 
     return rel_state, player_facing_flag
+
+

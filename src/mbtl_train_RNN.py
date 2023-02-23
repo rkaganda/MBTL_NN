@@ -28,6 +28,8 @@ state_format['buttons'] = config.settings['buttons']
 state_format['minmax'] = melty_state.get_minmax()
 state_format['attrib'], attrib_keys = melty_state.get_attributes()
 state_format['action_max'] = {}
+state_format['values'] = melty_state.get_values()
+state_format['categories'], state_format['categorical'] = melty_state.get_categories()
 
 
 logging.basicConfig(filename='../logs/train.log', level=logging.DEBUG, format='%(asctime)s %(levelname)-8s %(message)s')

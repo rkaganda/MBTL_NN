@@ -69,7 +69,14 @@ class EvalWorker(mp.Process):
         self.model = None
         self.target = None
         self.optimizer = None
-        self.model_input_size = (len(self.state_format['attrib']) * 2) + 1
+
+        # get total size of categorical features
+        one_hot_size = 0
+        for c, c_list in self.state_format['categorical'].items():
+            one_hot_size = len(c_list)
+        # sum features, value features + categorical features + last input
+        self.model_input_size = (len(self.state_format['values'])*2) + (one_hot_size*2) + (input_index_max+1)
+        print(self.model_input_size)
 
         self.episode_number = 0
 
@@ -90,24 +97,28 @@ class EvalWorker(mp.Process):
         game_state, player_facing_flag = melty_state.encode_relative_states(copy.deepcopy(state['game']), self.player_idx)
         norm_state['game'] = list()
         for p_idx in [0, 1]:  # for each player state
-            for attrib in self.state_format['attrib']:  # for each attribute
+            for attrib in self.state_format['values']:  # for each attribute
                 if attrib not in game_state[p_idx]:
                     print("failed attrib={}".format(attrib))
                     print(game_state[p_idx])
-                # if value is outside min max
-                if game_state[p_idx][attrib] > minmax[attrib]['max'] or \
-                        game_state[p_idx][attrib] < minmax[attrib]['min']:
-                    pass
-                # range = max - min
                 min_max_diff = minmax[attrib]['max'] - minmax[attrib]['min']
-
                 # norm = (value - min) / (max - min) unless max - min = 0
                 norm_state['game'].append((game_state[p_idx][attrib] - minmax[attrib]['min']) / (
                     min_max_diff) if min_max_diff != 0 else 0)
 
-        # normalize input
+            # encode categorical
+            categorical_states = []
+            for category in self.state_format['categories']:
+                category_list = [0] * len(self.state_format['categorical'][category])
+                category_list[self.state_format['categorical'][category][str(game_state[p_idx][category])]] = 1  # encode
+                categorical_states = categorical_states + category_list
+            # append categorical
+            norm_state['game'] = norm_state['game'] + categorical_states
+
+        # encode input
         input_index = state['input'][self.player_idx]
-        norm_state['input'] = input_index / (self.input_index_max + 1)
+        norm_state['input'] = [0]*(self.input_index_max + 1)  # create list of size
+        norm_state['input'][input_index] = 1  # encode
 
         return norm_state, {'game': game_state, 'input': state['input']}, player_facing_flag
 
@@ -144,9 +155,6 @@ class EvalWorker(mp.Process):
             self.reward_paths = eval_util.get_reward_paths(self.player_idx)
 
         self.target.eval()
-        # with torch.no_grad():
-        #     in_tensor = torch.ones(self.model_input_size).to(device)
-        #     out_tensor = self.model(in_tensor)
 
         # warm up model
         stress_data = []
@@ -279,7 +287,7 @@ class EvalWorker(mp.Process):
                                     continue
                                 else:
                                     flat_frames.append(
-                                        normalized_states[f_idx]['game'] + [normalized_inputs[f_idx]])
+                                        normalized_states[f_idx]['game'] + normalized_inputs[f_idx])
 
                             if random.random() < eps_threshold:
                                 detached_out = torch.Tensor(np.random.rand(self.input_index_max + 1))
