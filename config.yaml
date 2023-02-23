@@ -22,8 +22,8 @@ count_save: 1
 # explore
 probability_action: false
 final_epsilon:  0
-initial_epsilon: 0
-epsilon_decay: 1
+initial_epsilon: 1
+epsilon_decay: 50
 no_explore_limit: 0
 explore_reset: 10
 eps_explore_threshold: .01
@@ -47,7 +47,7 @@ episode_sample_size: 1
 last_episode_only: False
 batch_size: 512
 epochs: 1
-tau: 5
+tau: 50
 
 # inputs
 directions:

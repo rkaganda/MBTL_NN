@@ -324,7 +324,7 @@ class EvalWorker(mp.Process):
                                 logger.exception(e)
                                 raise e
 
-                            if self.episode_number < 3 or self.episode_number % 3 == 0:
+                            if self.episode_number % 5 == 0:
                                 action_index = act_sequence[last_evaluated_index % (len(act_sequence) - 1)]
                             self.input_index.value = action_index
                             self.player_facing_flag.value = player_facing_flag
