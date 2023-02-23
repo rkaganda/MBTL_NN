@@ -1,9 +1,9 @@
-run_name: "reduced_reward_test"
+run_name: "shiki_shiki_cpu"
 
 player_count: 1
 
 p0_model:
-  name: "reduced_reward_test_p0iusoduwdi"
+  name: "shiki_shiki_cpu_1"
   frames_per_observation: 10
   reaction_delay: 1
   learning_rate: 1e-4
@@ -22,7 +22,7 @@ count_save: 1
 # explore
 probability_action: true
 final_epsilon:  0
-initial_epsilon: 0
+initial_epsilon: 1
 epsilon_decay: 100
 no_explore_limit: 0
 explore_reset: 1000
@@ -30,9 +30,9 @@ eps_explore_threshold: 0
 
 
 # reward
-reward_gamma: .75
+reward_gamma: .5
 atk_preframes: 2
-whiff_reward: -1000
+whiff_reward: 0
 reward_columns:
   0:
     "p_0_health": 1
