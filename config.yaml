@@ -4,13 +4,13 @@ player_count: 1
 
 p0_model:
   name: "p1_shiki_hot_one_encode"
-  frames_per_observation: 10
+  frames_per_observation: 5
   reaction_delay: 1
   learning_rate: 1e-4
 
 p1_model:
   name: "blank"
-  frames_per_observation: 10
+  frames_per_observation: 5
   reaction_delay: 1
   learning_rate: 1e-4
 
