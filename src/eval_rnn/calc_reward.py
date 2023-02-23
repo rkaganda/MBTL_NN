@@ -64,7 +64,7 @@ def calculate_actual_state_df(file_dict: dict) -> pd.DataFrame:
             for attrib, value in player_states.items():
                 row["p_{}_{}".format(player_id, attrib)] = value
 
-        row["input"] = item['input']
+        row["p_input"] = item['input']
         actual_state_dict[index] = row
 
     actual_state_df = pd.DataFrame.from_dict(actual_state_dict, orient='index')
@@ -142,15 +142,10 @@ def trim_reward_df(df: pd.DataFrame, reward_column: str, reaction_delay: int) ->
     :return:
     """
     state_columns = [c for c in df.columns if c.startswith('input_')]
-    df = df[state_columns + [reward_column] + ['action_index']]
+    df = df[state_columns + [reward_column] + ['p_input']]
     df = df.rename(columns={reward_column: "reward"})
 
     df = df[:-1]
-
-    # df['reward'] = (df['reward'] - 242.558952) / 758.366903
-    df['reward'] = df['reward'] / 4000
-    df['reward'] = df['reward'].shift(-(reaction_delay+1))
-
     df = df.dropna()
 
     return df
@@ -270,14 +265,11 @@ def apply_motion_type_reward(df: pd.DataFrame, atk_preframes: int, whiff_reward:
     # apply reward for each motion seg
     for hs in motion_type_segment:
         if (df[hs[0]:hs[1]][atk_col].sum() > 1) or (hs[0] in hit_motion_segments):  # if motion has attack in it or hits
+            reward_start = hs[0] - 2
+            reward_end = hs[0] - 1
             if df[hs[0]:hs[1]][enemy_hit_col].sum() > 1:  # if motion hits
                 reward_value = df[(df.index >= hs[0]) & (df.index <= hs[1])]['p_1_health_diff'].sum()
-            else:
-                reward_value = whiff_reward
-            df.loc[(df.index >= hs[0] - atk_preframes) & (df.index < hs[0]), 'reward'] = \
-                df.loc[
-                    (df.index >= hs[0] - atk_preframes) & (df.index < hs[0]), 'reward'] + reward_value  # apply reward
-
+                df.loc[(df.index >= reward_start) & (df.index < reward_end), 'reward'] = reward_value/4000  # apply reward
     return df
 
 
@@ -336,9 +328,10 @@ def apply_negative_motion_type_reward(df: pd.DataFrame, atk_preframes: int, whif
     # apply reward for each motion seg
     for hs in motion_type_segment:
         if hs[0] in hit_motion_segments_value:  # if motion has attack in it or hits
-            df.loc[(df.index >= hs[0] - atk_preframes) & (df.index < hs[0]), 'reward'] = \
-                df.loc[(df.index >= hs[0] - atk_preframes) & (df.index < hs[0]), 'reward'] + hit_motion_segments_value[
-                    hs[0]]  # apply reward
+            reward_start = hs[0] - 2
+            reward_end = hs[0] - 1
+            df.loc[(df.index >= reward_start) & (df.index < reward_end), 'reward'] = hit_motion_segments_value[
+                hs[0]]/4000  # apply reward
 
     return df
 
@@ -370,7 +363,7 @@ def generate_json_from_in_out_df(output_with_input_and_reward: pd.DataFrame):
     json_dict = {}
 
     state_columns = [c for c in output_with_input_and_reward.columns if c.startswith('input_')]
-    action_columns = [c for c in output_with_input_and_reward.columns if c.startswith('action_index')]
+    action_columns = [c for c in output_with_input_and_reward.columns if c.startswith('p_input')]
 
     json_dict['state'] = output_with_input_and_reward[state_columns].values.tolist()
     json_dict['reward'] = output_with_input_and_reward['reward'].values.tolist()
