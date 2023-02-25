@@ -218,9 +218,19 @@ def apply_reward_discount(df, discount_factor):
     discounted_rewards = discounted_rewards[::-1]
     df['discounted_reward'] = discounted_rewards
     df['actual_reward'] = df['discounted_reward']
-    df = df[df['actual_reward'].abs() > .001]
 
-    return df
+    df['actual_reward'] = df.apply(lambda x: 0 if abs(x['actual_reward']) < .01 else x['actual_reward'], axis=1)
+
+    new_df = []
+    last_value = 0
+    for idx, row in df.iterrows():
+        if row['actual_reward'] != 0 or last_value != 0:
+            new_df.append(row.copy())
+        last_value = row['actual_reward']
+
+    new_df = pd.DataFrame(new_df).reset_index()
+
+    return new_df
 
 
 def apply_motion_type_reward(df: pd.DataFrame, atk_preframes: int, whiff_reward: float):

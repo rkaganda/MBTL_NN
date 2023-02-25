@@ -48,6 +48,13 @@ def load_reward_data(reward_paths):
         full_data['next_state'].append([0.0] * len(full_data['next_state'][0]))
         full_data['done'] = [0] * len(full_data['next_state'])
         full_data['done'][-1] = 1
+
+        # add done splits
+        for idx, _d in enumerate(full_data['done']):
+            if full_data['reward'][idx] == 0:
+                full_data['next_state'][idx] = ([0.0] * len(full_data['next_state'][0]))
+                full_data['done'][idx] = 1
+
     return full_data
 
 
@@ -130,11 +137,11 @@ def train_model(reward_paths, stats_path, model, target, optim, epochs, episode_
     train_loader = torch.utils.data.DataLoader(dataset, sampler=sampler, batch_size=1)
 
     eps_loss = 0
-    for step, batch_data in tqdm(enumerate(train_loader), total=config.settings['batch_size']):
+    for step, batch_data in tqdm(enumerate(train_loader), total=len(dataset)):
         train_loss, lr = train(model, target, optim, batch_data)
         eps_loss = eps_loss + train_loss
-        if step >= config.settings['batch_size']:
-            break
+        # if step >= config.settings['batch_size']:
+        #     break
     writer.add_scalar("Loss/train", eps_loss/len(reward_data), episode_num)
     writer.flush()
 
