@@ -218,6 +218,7 @@ def apply_reward_discount(df, discount_factor):
     discounted_rewards = discounted_rewards[::-1]
     df['discounted_reward'] = discounted_rewards
     df['actual_reward'] = df['discounted_reward']
+    df = df[df['actual_reward'].abs() > .001]
 
     return df
 
