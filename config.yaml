@@ -1,9 +1,9 @@
-run_name: "hot_one_encode_1_layer"
+run_name: "hot_one_encode_1_layer_0_reward"
 
 player_count: 1
 
 p0_model:
-  name: "p1_shiki_1_layer"
+  name: "p1_shiki_1_layer_0_reward"
   frames_per_observation: 5
   reaction_delay: 1
   learning_rate: 1e-4
