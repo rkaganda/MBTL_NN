@@ -340,7 +340,7 @@ def calculate_pred_q_error(_df: pd.DataFrame, stats_path: str, episode_num):
     writer = SummaryWriter(stats_path)
 
     df = _df[['actual_reward','pred_q']].copy()
-    df['actual_reward'] = df['actual_reward'] / 4000
+    df['actual_reward'] = df['actual_reward']
     df['pred_q_error'] = df['actual_reward'] - df['pred_q']
     df[['pred_q']] = df[['pred_q']].fillna(value=0)
 
