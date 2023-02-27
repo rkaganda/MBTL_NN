@@ -308,7 +308,7 @@ class EvalWorker(mp.Process):
                                 detached_out = out_tensor[-1].detach().cpu()
                                 pred_q_count = pred_q_count + 1
                                 pred_q_sum = pred_q_sum + detached_out[-1].max().numpy().item()
-                                mean_pred_q = pred_q_sum / pred_q_count
+                                mean_pred_q = pred_q_sum / 2
 
                                 if explore_better_action and detached_out[-1].max() < mean_pred_q:
                                     out_clone = detached_out.clone()
