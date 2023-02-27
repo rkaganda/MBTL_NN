@@ -248,6 +248,7 @@ class EvalWorker(mp.Process):
             no_explore_count = 0
             explore_better_action = False
             mean_pred_q = 0
+            pred_q_sum = 0
             pred_q_count = 0
 
             if config.settings['probability_action'] and no_explore_count >= config.settings['no_explore_limit']:
@@ -306,7 +307,8 @@ class EvalWorker(mp.Process):
 
                                 detached_out = out_tensor[-1].detach().cpu()
                                 pred_q_count = pred_q_count + 1
-                                mean_pred_q = (mean_pred_q + detached_out[-1].max().numpy().item()) / pred_q_count
+                                pred_q_sum = pred_q_sum + detached_out[-1].max().numpy().item()
+                                mean_pred_q = pred_q_sum / pred_q_count
 
                                 if explore_better_action and detached_out[-1].max() < mean_pred_q:
                                     out_clone = detached_out.clone()
