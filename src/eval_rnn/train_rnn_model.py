@@ -116,7 +116,7 @@ def train(model, target, optim, data):
     loss = F.smooth_l1_loss(q_values, q_targets[0])
     optim.zero_grad()
     loss.backward()
-    nn.utils.clip_grad_value_(model.parameters, clip_value=1.0)
+    nn.utils.clip_grad_value_(model.parameters(), clip_value=1.0)
     optim.step()
 
     train_loss += loss.item()
