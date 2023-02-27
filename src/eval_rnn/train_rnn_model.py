@@ -108,7 +108,7 @@ def train(model, target, optim, data):
     with torch.no_grad():
         next_q_values, _ = target(next_state)
         next_q_values = next_q_values.max(dim=1)[0]
-        q_targets = reward + (1 - done) * next_q_values
+        q_targets = reward + ((1 - done) * next_q_values)
 
     q_values, _ = model(state)
     q_values = q_values.gather(1, action[0].to(torch.int64)).squeeze(1)
@@ -116,6 +116,7 @@ def train(model, target, optim, data):
     loss = F.smooth_l1_loss(q_values, q_targets[0])
     optim.zero_grad()
     loss.backward()
+    nn.utils.clip_grad_value_(model.parameters, clip_value=1.0)
     optim.step()
 
     train_loss += loss.item()
