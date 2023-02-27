@@ -247,6 +247,8 @@ class EvalWorker(mp.Process):
             esp_count = 0
             no_explore_count = 0
             explore_better_action = False
+            mean_pred_q = 0
+            pred_q_count = 0
 
             if config.settings['probability_action'] and no_explore_count >= config.settings['no_explore_limit']:
                 explore_better_action = True
@@ -303,7 +305,10 @@ class EvalWorker(mp.Process):
                                     out_tensor, hidden_state = self.model(in_tensor.unsqueeze(0))
 
                                 detached_out = out_tensor[-1].detach().cpu()
-                                if explore_better_action and detached_out[-1].max() < 0:
+                                pred_q_count = pred_q_count + 1
+                                mean_pred_q = mean_pred_q + detached_out[-1].max() / pred_q_count
+
+                                if explore_better_action and detached_out[-1].max() < mean_pred_q:
                                     out_clone = detached_out.clone()
                                     if out_clone.min() < 0:
                                         out_clone = out_clone - out_clone.min()
@@ -317,7 +322,9 @@ class EvalWorker(mp.Process):
                                     cur_frame=len(self.states)-1,
                                     eval_frame=last_normalized_index,
                                     action=action_index,
-                                    q=max_q)
+                                    q=max_q,
+                                    mean_q=mean_pred_q
+                                )
 
                             except RuntimeError as e:
                                 logger.debug("in_tensor={}".format(in_tensor))

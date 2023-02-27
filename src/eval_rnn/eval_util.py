@@ -92,10 +92,12 @@ def get_next_episode(player_idx):
     return max_episode, run_count
 
 
-def print_q(cur_frame, eval_frame, action, q):
-    sys.stdout.write("\r cur_frame={}, eval_frame={}, action= {} est_Q= {}".format(
+def print_q(cur_frame, eval_frame, action, q, mean_q):
+    sys.stdout.write("\r cur_frame={}, eval_frame={}, action= {} est_Q= {} mean_q={}".format(
         str(cur_frame).ljust(4),
         str(eval_frame).ljust(4),
         str(action).ljust(3),
-        str(q).ljust(5)))
+        str(round(q,2)).ljust(5),
+        str(round(mean_q, 2)).ljust(5))
+    )
     sys.stdout.flush()

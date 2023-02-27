@@ -1,6 +1,6 @@
-run_name: "trimmed_reward"
+run_name: "trimmed_reward_cpu"
 
-player_count: 1
+player_count: 2
 
 p0_model:
   name: "p1_shiki_trimmed_reward"
@@ -9,7 +9,7 @@ p0_model:
   learning_rate: 1e-4
 
 p1_model:
-  name: "blank"
+  name: "blank_2"
   frames_per_observation: 5
   reaction_delay: 1
   learning_rate: 1e-4
@@ -26,7 +26,7 @@ initial_epsilon: 1
 epsilon_decay: 100
 no_explore_limit: 0
 explore_reset: 1000
-eps_explore_threshold: 0
+eps_explore_threshold: .5
 
 
 # reward
