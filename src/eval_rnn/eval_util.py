@@ -93,6 +93,10 @@ def get_next_episode(player_idx):
 
 
 def print_q(cur_frame, eval_frame, action, q, mean_q):
+    if q is not None:
+        q = round(q, 2)
+    if mean_q is not None:
+        mean_q = round(mean_q, 2)
     sys.stdout.write("\r cur_frame={}, eval_frame={}, action= {} est_Q= {} mean_q={}".format(
         str(cur_frame).ljust(4),
         str(eval_frame).ljust(4),
