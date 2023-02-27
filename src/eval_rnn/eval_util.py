@@ -101,7 +101,7 @@ def print_q(cur_frame, eval_frame, action, q, mean_q):
         str(cur_frame).ljust(4),
         str(eval_frame).ljust(4),
         str(action).ljust(3),
-        str(q,2).ljust(5),
-        str(mean_q, 2).ljust(5))
+        str(q).ljust(5),
+        str(mean_q).ljust(5))
     )
     sys.stdout.flush()
