@@ -9,6 +9,7 @@ import numpy as np
 
 import torch
 # import torch.multiprocessing as mp
+from torch.utils.tensorboard import SummaryWriter
 
 import melty_state
 import eval_rnn.model as model
@@ -65,6 +66,7 @@ class EvalWorker(mp.Process):
         self.state_format = state_format
         self.neutral_action_index = neutral_action_index
         self.norm_neut_index = neutral_action_index / (input_index_max - 1)
+        self.mean_pred_q = 0
 
         self.model = None
         self.target = None
@@ -201,6 +203,10 @@ class EvalWorker(mp.Process):
                                                     self.player_idx, self.episode_number)
         stats_path = "{}/runs/{}_{}".format(config.settings['data_path'], config.settings['run_name'],
                                          self.player_idx)
+
+        writer = SummaryWriter(stats_path)
+        writer.add_scalar("{}/{}".format("mean_pred_q", "train"), self.mean_pred_q, self.episode_number)
+
         reward_paths = calc_reward.generate_rewards(
             reward_path=reward_path,
             eval_path=eval_path,
@@ -247,9 +253,8 @@ class EvalWorker(mp.Process):
             esp_count = 0
             no_explore_count = 0
             explore_better_action = False
-            mean_pred_q = 0
+            self.mean_pred_q = 0
             pred_q_sum = 0
-            pred_q_count = 0
 
             if config.settings['probability_action'] and no_explore_count >= config.settings['no_explore_limit']:
                 explore_better_action = True
@@ -306,11 +311,10 @@ class EvalWorker(mp.Process):
                                     out_tensor, hidden_state = self.model(in_tensor.unsqueeze(0))
 
                                 detached_out = out_tensor[-1].detach().cpu()
-                                pred_q_count = pred_q_count + 1
-                                pred_q_sum = pred_q_sum + detached_out[-1].max().numpy().item()
-                                mean_pred_q = pred_q_sum / 2
+                                self.mean_pred_q = self.mean_pred_q + detached_out[-1].max().numpy().item()
+                                self.mean_pred_q = self.mean_pred_q / 2
 
-                                if explore_better_action and detached_out[-1].max() < mean_pred_q:
+                                if explore_better_action and detached_out[-1].max() < self.mean_pred_q:
                                     out_clone = detached_out.clone()
                                     if out_clone.min() < 0:
                                         out_clone = out_clone - out_clone.min()
@@ -325,7 +329,7 @@ class EvalWorker(mp.Process):
                                     eval_frame=last_normalized_index,
                                     action=action_index,
                                     q=max_q,
-                                    mean_q=mean_pred_q
+                                    mean_q=self.mean_pred_q
                                 )
 
                             except RuntimeError as e:
@@ -388,6 +392,7 @@ class EvalWorker(mp.Process):
                     model_output.clear()  # clear
                     last_normalized_index = 0
                     last_evaluated_index = 0
+                    self.mean_pred_q = 0
                     self.run_count = self.run_count + 1
                     logger.debug("{} finished cleanup".format(self.player_idx))
                     self.eval_status['storing_eval'] = False  # finished storing eval
