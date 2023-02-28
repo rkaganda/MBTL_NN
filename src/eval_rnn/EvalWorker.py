@@ -67,6 +67,7 @@ class EvalWorker(mp.Process):
         self.neutral_action_index = neutral_action_index
         self.norm_neut_index = neutral_action_index / (input_index_max - 1)
         self.mean_pred_q = 0
+        self.mean_pred_explore_count = 0
 
         self.model = None
         self.target = None
@@ -205,7 +206,8 @@ class EvalWorker(mp.Process):
                                          self.player_idx)
 
         writer = SummaryWriter(stats_path)
-        writer.add_scalar("{}/{}".format("mean_pred_q", "train"), self.mean_pred_q, self.episode_number)
+        writer.add_scalar("{}/{}".format("explore", "mean_pred_q"), self.mean_pred_q, self.episode_number)
+        writer.add_scalar("{}/{}".format("explore", "explore_count"), self.mean_pred_explore_count, self.episode_number)
 
         reward_paths = calc_reward.generate_rewards(
             reward_path=reward_path,
@@ -254,7 +256,8 @@ class EvalWorker(mp.Process):
             no_explore_count = 0
             explore_better_action = False
             self.mean_pred_q = 0
-            pred_q_sum = 0
+            last_mean_pred_q = self.mean_pred_q
+            self.mean_pred_explore_count = 0
 
             if config.settings['probability_action'] and no_explore_count >= config.settings['no_explore_limit']:
                 explore_better_action = True
@@ -314,7 +317,8 @@ class EvalWorker(mp.Process):
                                 self.mean_pred_q = self.mean_pred_q + detached_out[-1].max().numpy().item()
                                 self.mean_pred_q = self.mean_pred_q / 2
 
-                                if explore_better_action and detached_out[-1].max() < self.mean_pred_q:
+                                if explore_better_action and detached_out[-1].max() < last_mean_pred_q:
+                                    self.mean_pred_explore_count = self.mean_pred_explore_count + 1
                                     out_clone = detached_out.clone()
                                     if out_clone.min() < 0:
                                         out_clone = out_clone - out_clone.min()
@@ -392,7 +396,9 @@ class EvalWorker(mp.Process):
                     model_output.clear()  # clear
                     last_normalized_index = 0
                     last_evaluated_index = 0
+                    last_mean_pred_q = self.mean_pred_q
                     self.mean_pred_q = 0
+                    self.mean_pred_explore_count = 0
                     self.run_count = self.run_count + 1
                     logger.debug("{} finished cleanup".format(self.player_idx))
                     self.eval_status['storing_eval'] = False  # finished storing eval

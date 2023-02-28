@@ -1,15 +1,15 @@
-run_name: "mean_pred_q_test"
+run_name: "mean_pred_q_test_tau_200"
 
 player_count: 2
 
 p0_model:
-  name: "p1_pred_q_test"
+  name: "p1_pred_q_test_tau_200"
   frames_per_observation: 5
   reaction_delay: 1
   learning_rate: 1e-4
 
 p1_model:
-  name: "p2_pred_q_test"
+  name: "p2_pred_q_test_tau_200"
   frames_per_observation: 5
   reaction_delay: 1
   learning_rate: 1e-4
@@ -47,7 +47,7 @@ episode_sample_size: 1
 last_episode_only: False
 batch_size: 512
 epochs: 1
-tau: 100
+tau: 200
 
 # inputs
 directions:
