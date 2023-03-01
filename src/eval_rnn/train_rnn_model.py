@@ -108,7 +108,7 @@ def train(model, target, optim, data):
     with torch.no_grad():
         next_q_values, _ = target(next_state)
         next_q_values = next_q_values.max(dim=1)[0]
-        q_targets = reward + ((1 - done) * next_q_values)
+        q_targets = reward + ((1 - done) * next_q_values * config.settings['reward_gamma'])
 
     q_values, _ = model(state)
     q_values = q_values.gather(1, action[0].to(torch.int64)).squeeze(1)
