@@ -46,7 +46,7 @@ reward_falloff: 25
 episode_sample_size: 1
 last_episode_only: False
 batch_size: 512
-epochs: 1
+epochs: 4
 tau: 200
 
 # inputs

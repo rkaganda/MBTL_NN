@@ -7,7 +7,7 @@ class ActionScript:
                              ([32]*5) + \
                              ([40]*39) + \
                              [11] + \
-                             ([40]*40)
+                             ([40]*47)
 
     def get_current_frame(self):
         return self.current_frame

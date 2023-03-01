@@ -138,12 +138,13 @@ def train_model(reward_paths, stats_path, model, target, optim, epochs, episode_
     train_loader = torch.utils.data.DataLoader(dataset, sampler=sampler, batch_size=1)
 
     eps_loss = 0
-    for step, batch_data in tqdm(enumerate(train_loader), total=len(dataset)):
-        train_loss, lr = train(model, target, optim, batch_data)
-        eps_loss = eps_loss + train_loss
-        # if step >= config.settings['batch_size']:
-        #     break
-    writer.add_scalar("Loss/train", eps_loss/len(reward_data), episode_num)
+    for epoch in tqdm(range(epochs)):
+        for step, batch_data in tqdm(enumerate(train_loader), total=len(dataset)):
+            train_loss, lr = train(model, target, optim, batch_data)
+            eps_loss = eps_loss + train_loss
+            # if step >= config.settings['batch_size']:
+            #     break
+    writer.add_scalar("Loss/train", eps_loss/len(reward_data)*epochs, episode_num)
     writer.flush()
 
 
