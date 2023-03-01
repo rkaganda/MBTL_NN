@@ -17,6 +17,7 @@ import eval_rnn.eval_util as eval_util
 import config
 from eval_rnn import calc_reward
 from eval_rnn import train_rnn_model
+from action_scripts import action_script
 
 logging.basicConfig(filename='./logs/train.log', level=logging.DEBUG, format='%(asctime)s %(levelname)-8s %(message)s')
 logger = logging.getLogger(__name__)
@@ -259,6 +260,9 @@ class EvalWorker(mp.Process):
             last_mean_pred_q = self.mean_pred_q
             self.mean_pred_explore_count = 0
 
+            # TODO ACTION SCRIPT
+            act_script = action_script.ActionScript()
+
             if config.settings['probability_action'] and no_explore_count >= config.settings['no_explore_limit']:
                 explore_better_action = True
                 print("explore_better_action={}".format(explore_better_action))
@@ -299,8 +303,16 @@ class EvalWorker(mp.Process):
                                 else:
                                     flat_frames.append(
                                         normalized_states[f_idx]['game'] + normalized_inputs[f_idx])
+                            # TODO ACTION
+                            if self.player_idx in [1]:
+                                action_index = act_script.get_action(self.states, last_evaluated_index)
+                                max_q = 0
+                                detached_out = torch.zeros(self.input_index_max + 1)
 
-                            if random.random() < eps_threshold:
+                            if act_script.get_current_frame() != -1:
+                                max_q = 0
+                                detached_out = torch.zeros(self.input_index_max + 1)
+                            elif random.random() < eps_threshold:
                                 detached_out = torch.Tensor(np.random.rand(self.input_index_max + 1))
                                 max_q = None
                                 action_index = torch.argmax(detached_out).numpy().item()
@@ -328,13 +340,14 @@ class EvalWorker(mp.Process):
                                     action_index = torch.argmax(detached_out).numpy().item()
                                     max_q = detached_out[-1].max().numpy().item()
                             try:
-                                eval_util.print_q(
-                                    cur_frame=len(self.states)-1,
-                                    eval_frame=last_normalized_index,
-                                    action=action_index,
-                                    q=max_q,
-                                    mean_q=self.mean_pred_q
-                                )
+                                pass
+                                # eval_util.print_q(
+                                #     cur_frame=len(self.states)-1,
+                                #     eval_frame=last_normalized_index,
+                                #     action=action_index,
+                                #     q=max_q,
+                                #     mean_q=self.mean_pred_q
+                                # )
 
                             except RuntimeError as e:
                                 logger.debug("in_tensor={}".format(in_tensor))
@@ -401,6 +414,7 @@ class EvalWorker(mp.Process):
                     self.mean_pred_explore_count = 0
                     self.run_count = self.run_count + 1
                     logger.debug("{} finished cleanup".format(self.player_idx))
+                    act_script.reset()
                     self.eval_status['storing_eval'] = False  # finished storing eval
         except Exception as identifier:
             logger.error(identifier)
