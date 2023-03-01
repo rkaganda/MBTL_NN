@@ -139,7 +139,7 @@ def train_model(reward_paths, stats_path, model, target, optim, epochs, episode_
 
     eps_loss = 0
     for epoch in tqdm(range(epochs)):
-        for step, batch_data in tqdm(enumerate(train_loader), total=len(dataset)):
+        for step, batch_data in enumerate(train_loader):
             train_loss, lr = train(model, target, optim, batch_data)
             eps_loss = eps_loss + train_loss
             # if step >= config.settings['batch_size']:
