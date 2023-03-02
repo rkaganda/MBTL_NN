@@ -306,8 +306,6 @@ class EvalWorker(mp.Process):
                             # TODO ACTION
                             if self.player_idx in [1]:
                                 action_index = act_script.get_action(self.states, last_evaluated_index)
-                                max_q = 0
-                                detached_out = torch.zeros(self.input_index_max + 1)
 
                             if act_script.get_current_frame() != -1:
                                 max_q = 0
@@ -326,10 +324,10 @@ class EvalWorker(mp.Process):
                                     out_tensor, hidden_state = self.model(in_tensor.unsqueeze(0))
 
                                 detached_out = out_tensor[-1].detach().cpu()
-                                self.mean_pred_q = self.mean_pred_q + detached_out[-1].max().numpy().item()
+                                self.mean_pred_q = self.mean_pred_q + detached_out.max().numpy().item()
                                 self.mean_pred_q = self.mean_pred_q / 2
 
-                                if explore_better_action and detached_out[-1].max() < last_mean_pred_q:
+                                if explore_better_action and detached_out.max() < last_mean_pred_q:
                                     self.mean_pred_explore_count = self.mean_pred_explore_count + 1
                                     out_clone = detached_out.clone()
                                     if out_clone.min() < 0:
@@ -338,7 +336,7 @@ class EvalWorker(mp.Process):
                                     max_q = detached_out[action_index].numpy().item()
                                 else:
                                     action_index = torch.argmax(detached_out).numpy().item()
-                                    max_q = detached_out[-1].max().numpy().item()
+                                    max_q = detached_out.max().numpy().item()
                             try:
                                 pass
                                 # eval_util.print_q(
