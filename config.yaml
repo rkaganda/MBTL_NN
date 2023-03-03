@@ -26,7 +26,7 @@ initial_epsilon: 1
 epsilon_decay: 100
 no_explore_limit: 1
 explore_reset: 1000
-eps_explore_threshold: .5
+eps_explore_threshold: 0
 
 
 # reward

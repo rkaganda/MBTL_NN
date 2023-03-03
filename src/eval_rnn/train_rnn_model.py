@@ -113,6 +113,8 @@ def train(model, target, optim, data):
     q_values, _ = model(state)
     q_values = q_values.gather(1, action[0].to(torch.int64)).squeeze(1)
 
+    reward_error = (q_values - reward).mean().abs()
+
     loss = F.smooth_l1_loss(q_values, q_targets[0])
     optim.zero_grad()
     loss.backward()
@@ -121,7 +123,7 @@ def train(model, target, optim, data):
 
     train_loss += loss.item()
 
-    return train_loss, optim.param_groups[0]['lr']
+    return train_loss, reward_error, optim.param_groups[0]['lr']
 
 
 def train_model(reward_paths, stats_path, model, target, optim, epochs, episode_num, window_size):
@@ -138,14 +140,17 @@ def train_model(reward_paths, stats_path, model, target, optim, epochs, episode_
     train_loader = torch.utils.data.DataLoader(dataset, sampler=sampler, batch_size=1)
 
     eps_loss = 0
+    total_reward_error = 0
     total_steps = 0
     for epoch in tqdm(range(epochs)):
         for step, batch_data in enumerate(train_loader):
-            train_loss, lr = train(model, target, optim, batch_data)
+            train_loss, reward_error, lr = train(model, target, optim, batch_data)
             eps_loss = eps_loss + train_loss
+            total_reward_error = reward_error + total_reward_error
             total_steps = total_steps + 1
             # if step >= config.settings['batch_size']:
             #     break
+    writer.add_scalar("Reward Error/train", total_reward_error/(total_steps*epochs), episode_num)
     writer.add_scalar("Loss/train", eps_loss/(total_steps*epochs), episode_num)
     writer.flush()
 

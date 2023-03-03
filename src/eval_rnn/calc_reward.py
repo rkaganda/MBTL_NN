@@ -354,9 +354,10 @@ def calculate_pred_q_error(_df: pd.DataFrame, stats_path: str, episode_num):
     for label, stat in zip(['over_estimated_pred_q', 'under_estimated_pred_q', 'total_pred_q_error'], [over_estimated_pred_q, under_estimated_pred_q, df['pred_q_error'].describe()]):
         for col in ['mean','count','std']:
             if col in stat.index:
-                writer.add_scalar("{}/{}".format(label,col), stat.loc[col], episode_num)
-    writer.add_scalar("reward/train", abs((1+_df['p_1_health_diff'].sum())/(1+_df['p_0_health_diff'].sum())), episode_num)
-    writer.flush()
+                pass
+                # writer.add_scalar("{}/{}".format(label,col), stat.loc[col], episode_num)
+    # writer.add_scalar("reward/train", abs((1+_df['p_1_health_diff'].sum())/(1+_df['p_0_health_diff'].sum())), episode_num)
+    # writer.flush()
 
 
 def generate_json_from_in_out_df(output_with_input_and_reward: pd.DataFrame):
