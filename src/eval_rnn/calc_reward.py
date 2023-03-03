@@ -209,15 +209,7 @@ def calculate_reward_from_eval(
 
 
 def apply_reward_discount(df, discount_factor):
-    discounted_rewards = []
-    cumulative_reward = 0
-    rewards = df['reward'].to_list()
-    for reward in rewards[::-1]:
-        cumulative_reward = reward + cumulative_reward * discount_factor
-        discounted_rewards.append(cumulative_reward)
-    discounted_rewards = discounted_rewards[::-1]
-    df['discounted_reward'] = discounted_rewards
-    df['actual_reward'] = df['discounted_reward']
+    df['actual_reward'] = df['reward']
 
     df['actual_reward'] = df.apply(lambda x: 0 if abs(x['actual_reward']) < .01 else x['actual_reward'], axis=1)
 
@@ -262,7 +254,8 @@ def apply_motion_type_reward(df: pd.DataFrame, atk_preframes: int, whiff_reward:
     u = df.groupby(v)[enemy_hit_col].agg(['all', 'count'])
     m = u['all'] & u['count'].ge(1)
 
-    hit_motion_segments = []
+    hit_motion_segments_value = {}
+
     # create motion_type segments
     hit_change_segments = df.groupby(v).apply(lambda x: (x.index[0], x.index[-1]))[m]
     for hs in hit_change_segments:
@@ -271,16 +264,17 @@ def apply_motion_type_reward(df: pd.DataFrame, atk_preframes: int, whiff_reward:
         hit_motion_start = hs[0]
         while hit_motion_type == df.loc[hit_motion_start - 1, 'p_0_motion_type']:
             hit_motion_start = hit_motion_start - 1
-        hit_motion_segments.append(hit_motion_start)
+        hit_motion_segments_value[hit_motion_start] = df[(df.index >= hs[0]) & (df.index <= hs[1])][
+            'p_1_health_diff'].sum()  # sum all damage for the entire hit segment
 
     # apply reward for each motion seg
     for hs in motion_type_segment:
-        if (df[hs[0]:hs[1]][atk_col].sum() > 1) or (hs[0] in hit_motion_segments):  # if motion has attack in it or hits
-            reward_start = hs[0] - 2
-            reward_end = hs[0] - 1
-            if df[hs[0]:hs[1]][enemy_hit_col].sum() > 1:  # if motion hits
-                reward_value = df[(df.index >= hs[0]) & (df.index <= hs[1])]['p_1_health_diff'].sum()
-                df.loc[(df.index >= reward_start) & (df.index < reward_end), 'reward'] = reward_value/4000  # apply reward
+        if hs[1] + 1 in hit_motion_segments_value:  # if motion has attack in it or hits
+            reward_start = hs[0]
+            reward_end = hs[1]
+            reward_value = hit_motion_segments_value[hs[1] + 1]
+            df.loc[(df.index >= reward_start) & (df.index < reward_end), 'reward'] = reward_value / 4000  # apply reward
+
     return df
 
 
