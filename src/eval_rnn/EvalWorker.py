@@ -327,7 +327,7 @@ class EvalWorker(mp.Process):
                                 self.mean_pred_q = self.mean_pred_q + detached_out.max().numpy().item()
                                 self.mean_pred_q = self.mean_pred_q / 2
 
-                                if explore_better_action and detached_out.max() < last_mean_pred_q:
+                                if explore_better_action:
                                     self.mean_pred_explore_count = self.mean_pred_explore_count + 1
                                     out_clone = detached_out.clone()
                                     if out_clone.min() < 0:
@@ -389,9 +389,8 @@ class EvalWorker(mp.Process):
                     else:
                         esp_count = esp_count + 1
 
-                    if config.settings['probability_action'] and no_explore_count >= config.settings['no_explore_limit']:
+                    if config.settings['probability_action']:
                         explore_better_action = True
-                        print("explore_better_action={}".format(explore_better_action))
 
                     self.epsilon = round(eps_threshold, 2)
                     print("eps={} no_explore={}".format(self.epsilon, no_explore_count))

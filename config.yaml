@@ -3,7 +3,7 @@ run_name: "action_script_flat_reward"
 player_count: 2
 
 p0_model:
-  name: "p1_action_script_flat_reward"
+  name: "p0_action_script_flat_reward"
   frames_per_observation: 5
   reaction_delay: 1
   learning_rate: 1e-4
@@ -22,7 +22,7 @@ count_save: 1
 # explore
 probability_action: true
 final_epsilon:  0
-initial_epsilon: 1
+initial_epsilon: 0
 epsilon_decay: 100
 no_explore_limit: 1
 explore_reset: 1000
