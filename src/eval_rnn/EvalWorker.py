@@ -383,6 +383,7 @@ class EvalWorker(mp.Process):
                         no_explore_count = no_explore_count + 1
 
                     if no_explore_count >= config.settings['explore_reset']:
+                        print("explore_reset")
                         esp_count = 0
                         no_explore_count = 0
                         explore_better_action = False
@@ -390,6 +391,7 @@ class EvalWorker(mp.Process):
                         esp_count = esp_count + 1
 
                     if config.settings['probability_action']:
+                        print("probability_action=True")
                         explore_better_action = True
 
                     self.epsilon = round(eps_threshold, 2)
