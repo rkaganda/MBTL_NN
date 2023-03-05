@@ -383,7 +383,7 @@ class EvalWorker(mp.Process):
                         esp_count = 0
                         no_explore_count = 0
                         if config.settings['probability_action']:
-                            explore_better_action = ~explore_better_action
+                            explore_better_action = not explore_better_action
                             print("explore_better_action={}".format(explore_better_action))
                     else:
                         esp_count = esp_count + 1
