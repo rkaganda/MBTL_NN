@@ -24,8 +24,7 @@ probability_action: true
 final_epsilon:  0
 initial_epsilon: 0
 epsilon_decay: 100
-no_explore_limit: 1
-explore_reset: 1000
+explore_reset: 10
 eps_explore_threshold: 0
 
 

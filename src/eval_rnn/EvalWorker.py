@@ -255,17 +255,13 @@ class EvalWorker(mp.Process):
             eps_threshold = initial_epsilon
             esp_count = 0
             no_explore_count = 0
-            explore_better_action = False
+            explore_better_action = config.settings['probability_action']
             self.mean_pred_q = 0
             last_mean_pred_q = self.mean_pred_q
             self.mean_pred_explore_count = 0
 
             # TODO ACTION SCRIPT
             act_script = action_script.ActionScript()
-
-            if config.settings['probability_action'] and no_explore_count >= config.settings['no_explore_limit']:
-                explore_better_action = True
-                print("explore_better_action={}".format(explore_better_action))
 
             self.eval_status['eval_ready'] = True  # eval is ready
             while not self.eval_status['kill_eval']:
@@ -386,13 +382,11 @@ class EvalWorker(mp.Process):
                         print("explore_reset")
                         esp_count = 0
                         no_explore_count = 0
-                        explore_better_action = False
+                        if config.settings['probability_action']:
+                            explore_better_action = ~explore_better_action
+                            print("explore_better_action={}".format(explore_better_action))
                     else:
                         esp_count = esp_count + 1
-
-                    if config.settings['probability_action']:
-                        print("probability_action=True")
-                        explore_better_action = True
 
                     self.epsilon = round(eps_threshold, 2)
                     print("eps={} no_explore={}".format(self.epsilon, no_explore_count))
