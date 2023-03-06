@@ -1,15 +1,15 @@
-run_name: "action_script_flat_reward"
+run_name: "input_mask_test"
 
 player_count: 2
 
 p0_model:
-  name: "p0_action_script_flat_reward"
+  name: "p0_input_mask"
   frames_per_observation: 5
   reaction_delay: 1
   learning_rate: 1e-4
 
 p1_model:
-  name: "p1_action_script_flat_reward"
+  name: "p1_input_mask"
   frames_per_observation: 5
   reaction_delay: 1
   learning_rate: 1e-4
@@ -20,9 +20,9 @@ minmax_file: "eval/categorical_less_minmax.json"
 count_save: 1
 
 # explore
-probability_action: true
+probability_action: True
 final_epsilon:  0
-initial_epsilon: 0
+initial_epsilon: 1
 epsilon_decay: 100
 explore_reset: 10
 eps_explore_threshold: 0
@@ -65,6 +65,9 @@ buttons:
   - "b"
   - "c"
   - "d"
+
+input_mask:
+  [0, 1, 2, 3, 8, 9, 10, 11, 16, 17, 18, 19, 24, 25, 26, 27, 32, 33, 34, 35, 40, 41, 42, 43, 48, 49, 50, 51, 56, 57, 58, 59, 64, 65, 66, 67]
 
 timer_max: 9999999
 

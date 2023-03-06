@@ -299,17 +299,15 @@ class EvalWorker(mp.Process):
                                 else:
                                     flat_frames.append(
                                         normalized_states[f_idx]['game'] + normalized_inputs[f_idx])
-                            # TODO ACTION
-                            if self.player_idx in [1]:
-                                action_index = act_script.get_action(self.states, last_evaluated_index)
-
-                            if act_script.get_current_frame() != -1:
-                                max_q = 0
-                                detached_out = torch.zeros(self.input_index_max + 1)
-                            elif random.random() < eps_threshold:
+                            # # TODO ACTION
+                            # if self.player_idx in [1]:
+                            #     action_index = act_script.get_action(self.states, last_evaluated_index)
+                            #
+                            # if act_script.get_current_frame() != -1:
+                            #     max_q = 0
+                            #     detached_out = torch.zeros(self.input_index_max + 1)
+                            if random.random() < eps_threshold:
                                 detached_out = torch.Tensor(np.random.rand(self.input_index_max + 1))
-                                max_q = None
-                                action_index = torch.argmax(detached_out).numpy().item()
                             else:
                                 # create tensor
                                 in_tensor = torch.Tensor(flat_frames).to(device)
@@ -328,11 +326,21 @@ class EvalWorker(mp.Process):
                                     out_clone = detached_out.clone()
                                     if out_clone.min() < 0:
                                         out_clone = out_clone - out_clone.min()
-                                    action_index = torch.multinomial(out_clone, 1).numpy().item()
-                                    max_q = detached_out[action_index].numpy().item()
-                                else:
-                                    action_index = torch.argmax(detached_out).numpy().item()
-                                    max_q = detached_out.max().numpy().item()
+
+                                    if config.settings['input_mask'] is not None:
+                                        action_index = torch.multinomial(out_clone[config.settings['input_mask']], 1).numpy().item()
+                                    else:
+                                        action_index = torch.multinomial(out_clone, 1).numpy().item()
+
+                            if config.settings['input_mask'] is not None:
+                                print("input mask")
+                                max_index = torch.argmax(
+                                    detached_out[config.settings['input_mask']]).numpy().item()
+                                action_index = config.settings['input_mask'][max_index]
+                                max_q = detached_out.max().numpy().item()
+                            else:
+                                action_index = torch.argmax(detached_out).numpy().item()
+                                max_q = detached_out[config.settings['input_mask']].max().numpy().item()
                             try:
                                 pass
                                 # eval_util.print_q(
