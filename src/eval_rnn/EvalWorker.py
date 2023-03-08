@@ -332,7 +332,7 @@ class EvalWorker(mp.Process):
                                     else:
                                         action_index = torch.multinomial(out_clone, 1).numpy().item()
 
-                            if config.settings['input_mask'] is not None:
+                            if config.settings['input_mask'] is not None and not explore_better_action:
                                 max_index = torch.argmax(
                                     detached_out[config.settings['input_mask']]).numpy().item()
                                 action_index = config.settings['input_mask'][max_index]

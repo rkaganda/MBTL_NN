@@ -1,15 +1,15 @@
-run_name: "input_mask_no_jump"
+run_name: "input_mask_test"
 
 player_count: 2
 
 p0_model:
-  name: "p0_input_mask_no_jump"
+  name: "p0_action_script_mask"
   frames_per_observation: 5
   reaction_delay: 1
   learning_rate: 1e-4
 
 p1_model:
-  name: "p1_input_mask_no_jump"
+  name: "p1_no_jump_mask"
   frames_per_observation: 5
   reaction_delay: 1
   learning_rate: 1e-4
