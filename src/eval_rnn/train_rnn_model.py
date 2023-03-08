@@ -146,17 +146,15 @@ def train_model(reward_paths, stats_path, model, target, optim, epochs, episode_
 
     eps_loss = 0.0
     total_reward_error = 0.0
-    total_steps = 0
     for epoch in tqdm(range(epochs)):
         for step, batch_data in enumerate(train_loader):
             train_loss, reward_error, lr = train(model, target, optim, batch_data)
             eps_loss = eps_loss + train_loss
             total_reward_error = reward_error + total_reward_error
-            total_steps = total_steps + 1
             # if step >= config.settings['batch_size']:
             #     break
-    writer.add_scalar("Reward Error/train", total_reward_error/(total_steps*epochs), episode_num)
-    writer.add_scalar("Loss/train", eps_loss/(total_steps*epochs), episode_num)
+    writer.add_scalar("Reward Error/train", total_reward_error/epochs, episode_num)
+    writer.add_scalar("Loss/train", eps_loss/epochs, episode_num)
     writer.flush()
 
 
