@@ -60,11 +60,11 @@ def load_reward_data(reward_paths):
 
 class RollingDataset(torch.utils.data.Dataset):
     def __init__(self, states, actions, rewards, next_states, done, window):
-        self.states = torch.Tensor(states).to(device)
-        self.actions = torch.Tensor(actions).to(device)
-        self.rewards = torch.Tensor(rewards).to(device)
-        self.next_states = torch.Tensor(next_states).to(device)
-        self.done = torch.Tensor(done).to(device)
+        self.states = torch.Tensor(states)
+        self.actions = torch.Tensor(actions)
+        self.rewards = torch.Tensor(rewards)
+        self.next_states = torch.Tensor(next_states)
+        self.done = torch.Tensor(done)
         self.window = window
 
     def __getitem__(self, index):
@@ -96,34 +96,39 @@ def create_dataset(data, window_size):
 
 
 def train(model, target, optim, data):
-    state = Variable(data[0])
-    action = Variable(data[1])
-    reward = Variable(data[2])
-    next_state = Variable(data[3])
-    done = Variable(data[4])
+    state = Variable(data[0]).to(device)
+    action = Variable(data[1]).to(device)
+    reward = Variable(data[2]).to(device)
+    next_state = Variable(data[3]).to(device)
+    done = Variable(data[4]).to(device)
 
     model.train()
-    train_loss = 0
+    gamma = .5
 
     with torch.no_grad():
         next_q_values, _ = target(next_state)
         next_q_values = next_q_values.max(dim=1)[0]
-        q_targets = reward + ((1 - done) * next_q_values * config.settings['reward_gamma'])
+
+        reward = torch.flatten(reward)
+
+        done = torch.flatten(done)
+
+        q_targets = reward + (1 - done) * next_q_values * config.settings['reward_gamma']
 
     q_values, _ = model(state)
-    q_values = q_values.gather(1, action[0].to(torch.int64)).squeeze(1)
 
+    action = action.flatten().unsqueeze(1)
+
+    q_values = q_values.gather(1, action.to(torch.int64)).squeeze(1)
     reward_error = (q_values - reward).mean().abs()
 
-    loss = F.smooth_l1_loss(q_values, q_targets[0])
+    loss = F.smooth_l1_loss(q_values, q_targets)
     optim.zero_grad()
     loss.backward()
     nn.utils.clip_grad_value_(model.parameters(), clip_value=1.0)
     optim.step()
 
-    train_loss += loss.item()
-
-    return train_loss, reward_error, optim.param_groups[0]['lr']
+    return loss, reward_error, optim.param_groups[0]['lr']
 
 
 def train_model(reward_paths, stats_path, model, target, optim, epochs, episode_num, window_size):
@@ -137,17 +142,16 @@ def train_model(reward_paths, stats_path, model, target, optim, epochs, episode_
     dataset = create_dataset(reward_data, window_size)
     sampler = torch.utils.data.RandomSampler(dataset)
 
-    train_loader = torch.utils.data.DataLoader(dataset, sampler=sampler, batch_size=1)
+    train_loader = torch.utils.data.DataLoader(dataset, sampler=sampler, batch_size=len(dataset))
 
-    eps_loss = 0
-    total_reward_error = 0
+    eps_loss = 0.0
+    total_reward_error = 0.0
     total_steps = 0
     for epoch in tqdm(range(epochs)):
         for step, batch_data in enumerate(train_loader):
             train_loss, reward_error, lr = train(model, target, optim, batch_data)
             eps_loss = eps_loss + train_loss
             total_reward_error = reward_error + total_reward_error
-            total_steps = total_steps + 1
             # if step >= config.settings['batch_size']:
             #     break
     writer.add_scalar("Reward Error/train", total_reward_error/(total_steps*epochs), episode_num)

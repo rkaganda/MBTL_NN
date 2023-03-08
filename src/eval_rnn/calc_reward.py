@@ -215,12 +215,15 @@ def apply_reward_discount(df, discount_factor):
 
     new_df = []
     last_value = 0
+    index_set = set()
+
     for idx, row in df.iterrows():
         if row['actual_reward'] != 0 or last_value != 0:
-            new_df.append(row.copy())
+            for i in range(idx - 20, idx + 1):
+                index_set.add(i)
         last_value = row['actual_reward']
 
-    new_df = pd.DataFrame(new_df).reset_index()
+    new_df = df[df.index.isin(list(index_set))].copy().reset_index()
 
     return new_df
 

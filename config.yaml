@@ -1,16 +1,16 @@
-run_name: "input_mask_test"
+run_name: "extend_training_test"
 
 player_count: 2
 
 p0_model:
-  name: "p0_action_script_mask"
-  frames_per_observation: 5
+  name: "extend_training_test_p0"
+  frames_per_observation: 15
   reaction_delay: 1
   learning_rate: 1e-4
 
 p1_model:
-  name: "p1_no_jump_mask"
-  frames_per_observation: 5
+  name: "extend_training_test_p1"
+  frames_per_observation: 15
   reaction_delay: 1
   learning_rate: 1e-4
 
@@ -22,7 +22,7 @@ count_save: 1
 # explore
 probability_action: False
 final_epsilon:  0
-initial_epsilon: 0
+initial_epsilon: 1
 epsilon_decay: 100
 explore_reset: 10
 eps_explore_threshold: 0
@@ -67,7 +67,7 @@ buttons:
   - "d"
 
 input_mask:
-  [0, 1, 2, 3, 8, 9, 10, 11, 16, 17, 18, 19, 24, 25, 26, 27, 32, 33, 34, 35, 40, 41, 42, 43]
+
 
 timer_max: 9999999
 
