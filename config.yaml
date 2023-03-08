@@ -1,6 +1,6 @@
 run_name: "extend_training_test"
 
-player_count: 2
+player_count: 1
 
 p0_model:
   name: "extend_training_test_p0"

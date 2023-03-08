@@ -152,6 +152,7 @@ def train_model(reward_paths, stats_path, model, target, optim, epochs, episode_
             train_loss, reward_error, lr = train(model, target, optim, batch_data)
             eps_loss = eps_loss + train_loss
             total_reward_error = reward_error + total_reward_error
+            total_steps = total_steps + 1
             # if step >= config.settings['batch_size']:
             #     break
     writer.add_scalar("Reward Error/train", total_reward_error/(total_steps*epochs), episode_num)
