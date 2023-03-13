@@ -142,7 +142,7 @@ def trim_reward_df(df: pd.DataFrame, reward_column: str, reaction_delay: int) ->
     :return:
     """
     state_columns = [c for c in df.columns if c.startswith('input_')]
-    df = df[state_columns + [reward_column] + ['p_input']]
+    df = df[state_columns + [reward_column] + ['p_input','done']]
     df = df.rename(columns={reward_column: "reward"})
 
     df = df[:-1]
@@ -223,7 +223,13 @@ def apply_reward_discount(df, discount_factor):
                 index_set.add(i)
         last_value = row['actual_reward']
 
-    new_df = df[df.index.isin(list(index_set))].copy().reset_index()
+    new_df = df[df.index.isin(list(index_set))].copy()
+    new_df.sort_index(inplace=True)
+    new_df['index_diff'] = new_df.index.to_series().diff()
+    new_df['done'] = new_df.apply(lambda x: 0 if x['index_diff'] == 1 else 1, axis=1)
+    new_df.reset_index(inplace=True)
+    new_df.loc[0, 'done'] = 0
+    new_df.loc[new_df.index[-2], 'done'] = 1
 
     return new_df
 
@@ -377,6 +383,7 @@ def generate_json_from_in_out_df(output_with_input_and_reward: pd.DataFrame):
     json_dict['state'] = output_with_input_and_reward[state_columns].values.tolist()
     json_dict['reward'] = output_with_input_and_reward['reward'].values.tolist()
     json_dict['action'] = output_with_input_and_reward[action_columns].values.tolist()
+    json_dict['done'] = output_with_input_and_reward['done'].values.tolist()
 
     return json_dict
 

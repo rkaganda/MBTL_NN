@@ -46,14 +46,6 @@ def load_reward_data(reward_paths):
             full_data[k_] = full_data[k_] + i_
         full_data['next_state'] = full_data['state'][1:]
         full_data['next_state'].append([0.0] * len(full_data['next_state'][0]))
-        full_data['done'] = [0] * len(full_data['next_state'])
-        full_data['done'][-1] = 1
-
-        # add done splits
-        for idx, _d in enumerate(full_data['done']):
-            if full_data['reward'][idx] == 0:
-                full_data['next_state'][idx] = ([0.0] * len(full_data['next_state'][0]))
-                full_data['done'][idx] = 1
 
     return full_data
 
