@@ -112,7 +112,7 @@ def train(model, target, optim, data):
     action = action.flatten().unsqueeze(1)
 
     q_values = q_values.gather(1, action.to(torch.int64)).squeeze(1)
-    reward_error = (q_values - reward).mean().abs()
+    reward_error = (q_values - q_targets).abs().mean()
 
     loss = F.smooth_l1_loss(q_values, q_targets)
     optim.zero_grad()

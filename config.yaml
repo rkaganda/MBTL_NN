@@ -1,15 +1,15 @@
-run_name: "reward_segment_test"
+run_name: "skiki_v_shiki_extended"
 
 player_count: 1
 
 p0_model:
-  name: "reward_segment_test_p0"
+  name: "skiki_v_shiki_extended_p0"
   frames_per_observation: 15
   reaction_delay: 1
   learning_rate: 1e-4
 
 p1_model:
-  name: "reward_segment_test_p1"
+  name: "skiki_v_shiki_extended_p1"
   frames_per_observation: 15
   reaction_delay: 1
   learning_rate: 1e-4
@@ -23,7 +23,7 @@ count_save: 1
 probability_action: False
 final_epsilon:  0
 initial_epsilon: 1
-epsilon_decay: 100
+epsilon_decay: 200
 explore_reset: 10
 eps_explore_threshold: 0
 
