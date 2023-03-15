@@ -54,7 +54,7 @@ class RollingDataset(torch.utils.data.Dataset):
     def __init__(self, states, actions, rewards, next_states, done, window):
         self.states = torch.Tensor(states)
         self.actions = torch.Tensor(actions)
-        self.rewards = torcawisjdoaih.Tensor(rewards)
+        self.rewards = torch.Tensor(rewards)
         self.next_states = torch.Tensor(next_states)
         self.done = torch.Tensor(done)
         self.window = window
