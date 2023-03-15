@@ -107,12 +107,11 @@ def generate_diff(eval_state_df: pd.DataFrame, reward_columns: dict) -> pd.DataF
     return eval_state_df
 
 
-def trim_reward_df(df: pd.DataFrame, reward_column: str, reaction_delay: int) -> pd.DataFrame:
+def trim_reward_df(df: pd.DataFrame, reward_column: str) -> pd.DataFrame:
     """
     remove all columns not needed to generate reward file
-    :param eval_state_df:
+    :param df:
     :param reward_column:
-    :param reaction_delay:
     :return:
     """
     state_columns = [c for c in df.columns if c.startswith('input_')]
@@ -172,28 +171,30 @@ def calculate_reward_from_eval(
     eval_state_df = apply_negative_motion_type_reward(eval_state_df, atk_preframes, whiff_reward)
 
     # apply reward discounts
-    eval_state_df = apply_reward_discount(eval_state_df, reward_gamma)
+    eval_state_df = apply_reward_discount(eval_state_df, frames_per_observation)
 
     calculate_pred_q_error(eval_state_df, stats_path, episode_number)
 
     # trim full df down to just state, action, reward
-    output_with_input_and_reward = trim_reward_df(eval_state_df, 'actual_reward', reaction_delay)
+    output_with_input_and_reward = trim_reward_df(eval_state_df, 'actual_reward')
 
     return output_with_input_and_reward
 
 
-def apply_reward_discount(df, discount_factor):
+def apply_reward_discount(df: pd.DataFrame, frames_per_observation: int):
     df['actual_reward'] = df['reward']
 
     df['actual_reward'] = df.apply(lambda x: 0 if abs(x['actual_reward']) < .01 else x['actual_reward'], axis=1)
 
     new_df = []
     last_value = 0
+    sequence_count = []
+
     index_set = set()
 
     for idx, row in df.iterrows():
         if row['actual_reward'] != 0 or last_value != 0:
-            for i in range(idx - 20, idx + 1):
+            for i in range(idx - frames_per_observation, idx + 1):
                 index_set.add(i)
         last_value = row['actual_reward']
 
@@ -343,7 +344,7 @@ def calculate_pred_q_error(_df: pd.DataFrame, stats_path: str, episode_num):
     # writer.flush()
 
 
-def generate_json_from_in_out_df(output_with_input_and_reward: pd.DataFrame):
+def generate_json_from_in_out_df(output_with_input_and_reward: pd.DataFrame, frames_per_observation: int):
     """
     creates reward json from reward dataframe
     :param output_with_input_and_reward:
@@ -354,10 +355,15 @@ def generate_json_from_in_out_df(output_with_input_and_reward: pd.DataFrame):
     state_columns = [c for c in output_with_input_and_reward.columns if c.startswith('input_')]
     action_columns = [c for c in output_with_input_and_reward.columns if c.startswith('p_input')]
 
-    json_dict['state'] = output_with_input_and_reward[state_columns].values.tolist()
-    json_dict['reward'] = output_with_input_and_reward['reward'].values.tolist()
-    json_dict['action'] = output_with_input_and_reward[action_columns].values.tolist()
-    json_dict['done'] = output_with_input_and_reward['done'].values.tolist()
+    state_padding = [[0.0] * len(state_columns)] * (frames_per_observation - 1)
+    reward_padding = [0.0] * (frames_per_observation - 1)
+    action_padding = [[0.0] * 1] * (frames_per_observation - 1)
+    done_padding = [0.0] * (frames_per_observation - 1)
+
+    json_dict['state'] = state_padding + output_with_input_and_reward[state_columns].values.tolist()
+    json_dict['reward'] = reward_padding + output_with_input_and_reward['reward'].values.tolist()
+    json_dict['action'] = action_padding + output_with_input_and_reward[action_columns].values.tolist()
+    json_dict['done'] = done_padding + output_with_input_and_reward['done'].values.tolist()
 
     return json_dict
 
@@ -403,7 +409,7 @@ def generate_rewards(eval_path: str, reward_path: str, reward_columns: dict, fal
                     episode_number=episode_number
                 )
                 file_json = generate_json_from_in_out_df(
-                    output_with_input_and_reward=df)
+                    output_with_input_and_reward=df, frames_per_observation=frames_per_observation)
 
                 with open("{}/{}".format(reward_path, reward_file), 'w') as f_writer:
                     f_writer.write(json.dumps(file_json))

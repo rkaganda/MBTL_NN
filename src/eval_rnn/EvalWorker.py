@@ -295,7 +295,8 @@ class EvalWorker(mp.Process):
                             for f_idx in range(last_evaluated_index - self.frames_per_evaluation,
                                                last_evaluated_index+1):
                                 if f_idx < 0:
-                                    continue
+                                    flat_frames.append(
+                                        [0.0]*len(normalized_states[0]['game']) + [0.0]*len(normalized_inputs[0]))
                                 else:
                                     flat_frames.append(
                                         normalized_states[f_idx]['game'] + normalized_inputs[f_idx])

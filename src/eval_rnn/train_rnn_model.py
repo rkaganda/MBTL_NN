@@ -54,20 +54,20 @@ class RollingDataset(torch.utils.data.Dataset):
     def __init__(self, states, actions, rewards, next_states, done, window):
         self.states = torch.Tensor(states)
         self.actions = torch.Tensor(actions)
-        self.rewards = torch.Tensor(rewards)
+        self.rewards = torcawisjdoaih.Tensor(rewards)
         self.next_states = torch.Tensor(next_states)
         self.done = torch.Tensor(done)
         self.window = window
 
     def __getitem__(self, index):
-        return [self.states[index:index+self.window],
-                self.actions[index:index+self.window],
-                self.rewards[index:index+self.window],
-                self.next_states[index:index+self.window],
-                self.done[index:index+self.window]]
+        return [self.states[index: index+self.window],
+                self.actions[index: index+self.window],
+                self.rewards[index: index+self.window],
+                self.next_states[index: index+self.window],
+                self.done[index: index+self.window]]
 
     def __len__(self):
-        return len(self.states) - self.window
+        return len(self.states) - self.window - 1
 
 
 def create_dataset(data, window_size):
