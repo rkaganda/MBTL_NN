@@ -52,22 +52,28 @@ def load_reward_data(reward_paths):
 
 class RollingDataset(torch.utils.data.Dataset):
     def __init__(self, states, actions, rewards, next_states, done, window):
-        self.states = torch.Tensor(states)
-        self.actions = torch.Tensor(actions)
-        self.rewards = torch.Tensor(rewards)
-        self.next_states = torch.Tensor(next_states)
-        self.done = torch.Tensor(done)
-        self.window = window
+        self.data = []
+
+        index = 0
+        while index < len(done) - window:
+            self.data.append([
+                torch.Tensor(states[index: index + window]),
+                torch.Tensor(actions[index: index + window]),
+                torch.Tensor(rewards[index: index + window]),
+                torch.Tensor(next_states[index: index + window]),
+                torch.Tensor(done[index: index + window])
+            ])
+
+            if done[index + window - 1] == 0:
+                index = index + 1
+            else:
+                index = index + window
 
     def __getitem__(self, index):
-        return [self.states[index: index+self.window],
-                self.actions[index: index+self.window],
-                self.rewards[index: index+self.window],
-                self.next_states[index: index+self.window],
-                self.done[index: index+self.window]]
+        return self.data[index]
 
     def __len__(self):
-        return len(self.states) - self.window - 1
+        return len(self.data)
 
 
 def create_dataset(data, window_size):
