@@ -72,32 +72,6 @@ def calculate_actual_state_df(file_dict: dict) -> pd.DataFrame:
     return actual_state_df
 
 
-def calculate_reformed_input_df(eval_df: pd.DataFrame, norm_state_df: pd.DataFrame) -> pd.DataFrame:
-    """
-    merge the eval and normalized state dataframes such that each row represent an evaluation frame
-
-    :param eval_df:
-    :param norm_state_df:
-    :return:
-    """
-    input_windows = list()
-    for idx, row in eval_df.iterrows():
-        input_window = list()
-        # the model evaluates multiple frames of data each frame
-        # window_0 and window_1 are index of the start and end frames of data for that evaluation frame
-        for idx in range(int(row['window_0']), int(row['window_1']) + 1):
-            input_window = input_window + norm_state_df.iloc[idx].to_list()
-        input_windows.append(input_window)
-
-    reformed_input_df = pd.DataFrame(input_windows)
-    reformed_input_df.index = list(reformed_input_df.index)
-    reformed_input_df.columns = list(reformed_input_df.columns)
-    reformed_input_df.columns = reformed_input_df.columns.map(str)
-    reformed_input_df = reformed_input_df.add_prefix("state_")
-
-    return reformed_input_df
-
-
 def create_eval_state_df(eval_df: pd.DataFrame, actual_state_df: pd.DataFrame) -> pd.DataFrame:
     """
     merge all the dataframes together so that a single row contains
@@ -343,7 +317,7 @@ def apply_negative_motion_type_reward(df: pd.DataFrame, atk_preframes: int, whif
     for hs in motion_type_segment:
         if hs[0] in hit_motion_segments_value:  # if motion has attack in it or hits
             reward_start = hs[0] - 2
-            reward_end = hs[0] - 1
+            reward_end = hs[1] + 1
             df.loc[(df.index >= reward_start) & (df.index < reward_end), 'reward'] = hit_motion_segments_value[
                 hs[0]]/4000  # apply reward
 
