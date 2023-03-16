@@ -307,41 +307,47 @@ class EvalWorker(mp.Process):
                             # if act_script.get_current_frame() != -1:
                             #     max_q = 0
                             #     detached_out = torch.zeros(self.input_index_max + 1)
+
+                            # create tensor
+                            in_tensor = torch.Tensor(flat_frames).to(device)
+
+                            # input data into model
+                            self.model.eval()
+                            with torch.no_grad():
+                                out_tensor, hidden_state = self.model(in_tensor.unsqueeze(0))
+
+                            detached_out = out_tensor[-1].detach().cpu()
+
                             if random.random() < eps_threshold:
-                                detached_out = torch.Tensor(np.random.rand(self.input_index_max + 1))
-                            else:
-                                # create tensor
-                                in_tensor = torch.Tensor(flat_frames).to(device)
-
-                                # input data into model
-                                self.model.eval()
-                                with torch.no_grad():
-                                    out_tensor, hidden_state = self.model(in_tensor.unsqueeze(0))
-
-                                detached_out = out_tensor[-1].detach().cpu()
-                                self.mean_pred_q = self.mean_pred_q + detached_out.max().numpy().item()
-                                self.mean_pred_q = self.mean_pred_q / 2
-
-                                if explore_better_action:
-                                    self.mean_pred_explore_count = self.mean_pred_explore_count + 1
-                                    out_clone = detached_out.clone()
-                                    if out_clone.min() < 0:
-                                        out_clone = out_clone - out_clone.min()
-
-                                    # TODO ACTION
-                                    # if config.settings['input_mask'] is not None:
-                                    #     action_index = torch.multinomial(out_clone[config.settings['input_mask']], 1).numpy().item()
-                                    # else:
-                                    #     action_index = torch.multinomial(out_clone, 1).numpy().item()
-
-                            if config.settings['input_mask'] is not None and not explore_better_action:
-                                max_index = torch.argmax(
-                                    detached_out[config.settings['input_mask']]).numpy().item()
-                                action_index = config.settings['input_mask'][max_index]
-                                max_q = detached_out.max().numpy().item()
+                                action_index = random.randrange(0, len(detached_out))
                             else:
                                 action_index = torch.argmax(detached_out).numpy().item()
-                                max_q = detached_out[action_index].numpy().item()
+                            max_q = detached_out[action_index].numpy().item()
+
+
+                            # elif explore_better_action:
+                            #     self.mean_pred_explore_count = self.mean_pred_explore_count + 1
+                            #     out_clone = detached_out.clone()
+                            #     if out_clone.min() < 0:
+                            #         out_clone = out_clone - out_clone.min()
+
+                                # TODO ACTION
+                                # if config.settings['input_mask'] is not None:
+                                #     action_index = torch.multinomial(out_clone[config.settings['input_mask']], 1).numpy().item()
+                                # else:
+                                #     action_index = torch.multinomial(out_clone, 1).numpy().item()
+
+                            # if config.settings['input_mask'] is not None and not explore_better_action:
+                            #     max_index = torch.argmax(
+                            #         detached_out[config.settings['input_mask']]).numpy().item()
+                            #     action_index = config.settings['input_mask'][max_index]
+                            #     max_q = detached_out.max().numpy().item()
+                            # else:
+                            #     action_index = torch.argmax(detached_out).numpy().item()
+                            #     max_q = detached_out[action_index].numpy().item()
+
+                            self.mean_pred_q = self.mean_pred_q + max_q
+                            self.mean_pred_q = self.mean_pred_q / 2
                             try:
                                 pass
                                 # eval_util.print_q(
