@@ -110,15 +110,17 @@ def generate_diff(eval_state_df: pd.DataFrame, reward_columns: dict) -> pd.DataF
 def trim_reward_df(df: pd.DataFrame, reward_column: str) -> pd.DataFrame:
     """
     remove all columns not needed to generate reward file
-    :param df:
+    :param eval_state_df:
     :param reward_column:
+    :param reaction_delay:
     :return:
     """
     state_columns = [c for c in df.columns if c.startswith('input_')]
-    df = df[state_columns + [reward_column] + ['p_input','done']]
+    df = df[state_columns + [reward_column] + ['action_index', 'done', 'pred_q', 'old_idx']]
     df = df.rename(columns={reward_column: "reward"})
 
     df = df[:-1]
+
     df = df.dropna()
 
     return df
@@ -203,6 +205,7 @@ def apply_reward_discount(df: pd.DataFrame, frames_per_observation: int):
     new_df['index_diff'] = new_df.index.to_series().diff()
     new_df['done'] = new_df.apply(lambda x: 0 if x['index_diff'] == 1 else 1, axis=1)
     new_df.reset_index(inplace=True)
+    new_df.rename(columns={'index': 'old_idx'}, inplace=True)
     new_df.loc[0, 'done'] = 0
     new_df.loc[new_df.index[-2], 'done'] = 1
 
@@ -353,7 +356,7 @@ def generate_json_from_in_out_df(output_with_input_and_reward: pd.DataFrame, fra
     json_dict = {}
 
     state_columns = [c for c in output_with_input_and_reward.columns if c.startswith('input_')]
-    action_columns = [c for c in output_with_input_and_reward.columns if c.startswith('p_input')]
+    action_columns = [c for c in output_with_input_and_reward.columns if c.startswith('action_index')]
 
     state_padding = [[0.0] * len(state_columns)] * (frames_per_observation - 1)
     reward_padding = [0.0] * (frames_per_observation - 1)
@@ -364,6 +367,8 @@ def generate_json_from_in_out_df(output_with_input_and_reward: pd.DataFrame, fra
     json_dict['reward'] = reward_padding + output_with_input_and_reward['reward'].values.tolist()
     json_dict['action'] = action_padding + output_with_input_and_reward[action_columns].values.tolist()
     json_dict['done'] = done_padding + output_with_input_and_reward['done'].values.tolist()
+    json_dict['pred_q'] = done_padding + output_with_input_and_reward['pred_q'].values.tolist()
+    json_dict['frame'] = done_padding + output_with_input_and_reward['old_idx'].values.tolist()
 
     return json_dict
 

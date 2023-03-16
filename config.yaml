@@ -1,16 +1,16 @@
-run_name: "padding_test"
+run_name: "shiki_fixed_sequence"
 
 player_count: 1
 
 p0_model:
-  name: "shiki_padding_test_p0"
-  frames_per_observation: 20
+  name: "shiki_v_cpu_fixed_sequence_20f"
+  frames_per_observation: 20f
   reaction_delay: 1
   learning_rate: 1e-4
 
 p1_model:
   name: "shiki_v"
-  frames_per_observation: 20
+  frames_per_observation: 3
   reaction_delay: 1
   learning_rate: 1e-4
 

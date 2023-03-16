@@ -292,7 +292,7 @@ class EvalWorker(mp.Process):
                             # flatten for input into model
                             flat_frames = []
 
-                            for f_idx in range(last_evaluated_index - self.frames_per_evaluation,
+                            for f_idx in range(last_evaluated_index - self.frames_per_evaluation+1,
                                                last_evaluated_index+1):
                                 if f_idx < 0:
                                     flat_frames.append(
@@ -328,10 +328,11 @@ class EvalWorker(mp.Process):
                                     if out_clone.min() < 0:
                                         out_clone = out_clone - out_clone.min()
 
-                                    if config.settings['input_mask'] is not None:
-                                        action_index = torch.multinomial(out_clone[config.settings['input_mask']], 1).numpy().item()
-                                    else:
-                                        action_index = torch.multinomial(out_clone, 1).numpy().item()
+                                    # TODO ACTION
+                                    # if config.settings['input_mask'] is not None:
+                                    #     action_index = torch.multinomial(out_clone[config.settings['input_mask']], 1).numpy().item()
+                                    # else:
+                                    #     action_index = torch.multinomial(out_clone, 1).numpy().item()
 
                             if config.settings['input_mask'] is not None and not explore_better_action:
                                 max_index = torch.argmax(
@@ -340,7 +341,7 @@ class EvalWorker(mp.Process):
                                 max_q = detached_out.max().numpy().item()
                             else:
                                 action_index = torch.argmax(detached_out).numpy().item()
-                                max_q = detached_out[config.settings['input_mask']].max().numpy().item()
+                                max_q = detached_out[action_index].numpy().item()
                             try:
                                 pass
                                 # eval_util.print_q(
@@ -371,7 +372,7 @@ class EvalWorker(mp.Process):
                                 'norm_states': len(normalized_states),
                                 'last_evaluated_index': last_evaluated_index,
                                 'last_normalized_index': last_normalized_index,
-                                "epsilon": self.epsilon
+                                "epsilon": self.epsilon,
                             }
 
                             # increment evaluated index

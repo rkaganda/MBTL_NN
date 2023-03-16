@@ -147,7 +147,9 @@ def save_model(model, optim, player_idx):
     time_str = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
 
     torch.save(model.state_dict(), "{}/{}.model".format(path, time_str))
+    print("{}/{}.model saved".format(path, time_str))
     torch.save(optim.state_dict(), "{}/{}.optim".format(path, time_str))
+    print("{}/{}.optim saved".format(path, time_str))
 
 
 

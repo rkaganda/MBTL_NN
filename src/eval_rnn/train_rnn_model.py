@@ -43,7 +43,8 @@ def load_reward_data(reward_paths):
         with open(file) as f:
             file_dict = json.load(f)
         for k_, i_ in file_dict.items():
-            full_data[k_] = full_data[k_] + i_
+            if k_ in full_data.keys():
+                full_data[k_] = full_data[k_] + i_
         full_data['next_state'] = full_data['state'][1:]
         full_data['next_state'].append([0.0] * len(full_data['next_state'][0]))
 
@@ -54,14 +55,14 @@ class RollingDataset(torch.utils.data.Dataset):
     def __init__(self, states, actions, rewards, next_states, done, window):
         self.data = []
 
-        index = 0
+        index = window - 1
         while index < len(done) - window:
             self.data.append([
                 torch.Tensor(states[index: index + window]),
-                torch.Tensor(actions[index: index + window]),
-                torch.Tensor(rewards[index: index + window]),
+                torch.Tensor(actions[index:index + window]),
+                torch.Tensor(rewards[index:index + window]),
                 torch.Tensor(next_states[index: index + window]),
-                torch.Tensor(done[index: index + window])
+                torch.Tensor(done[index: index + window]),
             ])
 
             if done[index + window - 1] == 0:
