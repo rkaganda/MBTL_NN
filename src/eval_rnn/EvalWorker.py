@@ -318,33 +318,34 @@ class EvalWorker(mp.Process):
 
                             detached_out = out_tensor[-1].detach().cpu()
 
-                            if random.random() < eps_threshold:
-                                action_index = random.randrange(0, len(detached_out))
-                            else:
-                                action_index = torch.argmax(detached_out).numpy().item()
-                            max_q = detached_out[action_index].numpy().item()
+                            if random.random() < eps_threshold:  # explore
+                                if config.settings['input_mask'] is None:  # if no input mask
+                                    action_index = random.randrange(0, len(detached_out))  # select random action
+                                else:
+                                    # select random from mask
+                                    action_index = random.choice(config.settings['input_mask'])
+                            else:  # no explore
+                                if config.settings['input_mask'] is None:  # no mask
+                                    action_index = torch.argmax(detached_out).numpy().item()  # max predicted Q
+                                else:
+                                    # max predicted Q with mask
+                                    action_index = torch.argmax(
+                                        detached_out[config.settings['input_mask']]).numpy().item()
+                            max_q = detached_out[action_index].numpy().item()  # store predicted Q
 
+                            if explore_better_action and max_q < self.mean_pred_q:  # explore better action
+                                self.mean_pred_explore_count = self.mean_pred_explore_count + 1
+                                out_clone = detached_out.clone()  # clone the model predicted Qs
+                                if out_clone.min() < 0:  # normalize so that min is 0
+                                    out_clone = out_clone - out_clone.min()
 
-                            # elif explore_better_action:
-                            #     self.mean_pred_explore_count = self.mean_pred_explore_count + 1
-                            #     out_clone = detached_out.clone()
-                            #     if out_clone.min() < 0:
-                            #         out_clone = out_clone - out_clone.min()
-
-                                # TODO ACTION
-                                # if config.settings['input_mask'] is not None:
-                                #     action_index = torch.multinomial(out_clone[config.settings['input_mask']], 1).numpy().item()
-                                # else:
-                                #     action_index = torch.multinomial(out_clone, 1).numpy().item()
-
-                            # if config.settings['input_mask'] is not None and not explore_better_action:
-                            #     max_index = torch.argmax(
-                            #         detached_out[config.settings['input_mask']]).numpy().item()
-                            #     action_index = config.settings['input_mask'][max_index]
-                            #     max_q = detached_out.max().numpy().item()
-                            # else:
-                            #     action_index = torch.argmax(detached_out).numpy().item()
-                            #     max_q = detached_out[action_index].numpy().item()
+                                if config.settings['input_mask'] is None:  # no mask
+                                    # select action using predicted Q as probability distribution
+                                    action_index = torch.multinomial(out_clone, 1).numpy().item()
+                                else:
+                                    # select action using predicted Q as probability distribution from input mask
+                                    action_index = torch.multinomial(
+                                        out_clone[config.settings['input_mask']], 1).numpy().item()
 
                             self.mean_pred_q = self.mean_pred_q + max_q
                             self.mean_pred_q = self.mean_pred_q / 2
