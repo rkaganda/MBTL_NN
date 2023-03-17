@@ -94,7 +94,7 @@ def create_dataset(data, window_size):
     return dataset
 
 
-def train(model, target, optim, data):
+def train(model, target, optim, data, gamma):
     state = Variable(data[0]).to(device)
     action = Variable(data[1]).to(device)
     reward = Variable(data[2]).to(device)
@@ -112,7 +112,7 @@ def train(model, target, optim, data):
 
         done = torch.flatten(done)
 
-        q_targets = reward + (1 - done) * next_q_values * config.settings['reward_gamma']
+        q_targets = reward + (1 - done) * next_q_values * gamma
 
     q_values, _ = model(state)
 
@@ -130,7 +130,7 @@ def train(model, target, optim, data):
     return loss, reward_error, optim.param_groups[0]['lr']
 
 
-def train_model(reward_paths, stats_path, model, target, optim, epochs, episode_num, window_size):
+def train_model(reward_paths, stats_path, model, target, optim, epochs, episode_num, window_size, gamma):
     writer = SummaryWriter(stats_path)
     reward_data = load_reward_data(reward_paths)
 
@@ -147,7 +147,7 @@ def train_model(reward_paths, stats_path, model, target, optim, epochs, episode_
     total_reward_error = 0.0
     for epoch in tqdm(range(epochs)):
         for step, batch_data in enumerate(train_loader):
-            train_loss, reward_error, lr = train(model, target, optim, batch_data)
+            train_loss, reward_error, lr = train(model, target, optim, batch_data, gamma)
             eps_loss = eps_loss + train_loss
             total_reward_error = reward_error + total_reward_error
             # if step >= config.settings['batch_size']:
