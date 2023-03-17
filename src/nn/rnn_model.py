@@ -49,7 +49,6 @@ def setup_model(input_size, actions_size, learning_rate):
         hidden_dim=input_size,
         num_layers=1
     )
-    model.share_memory()
 
     optimizer = torch.optim.AdamW(model.parameters(), lr=learning_rate)
 
