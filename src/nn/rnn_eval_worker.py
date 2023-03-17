@@ -210,33 +210,37 @@ class EvalWorker(mp.Process):
         writer.add_scalar("{}/{}".format("explore", "mean_pred_q"), self.mean_pred_q, self.episode_number)
         writer.add_scalar("{}/{}".format("explore", "explore_count"), self.mean_pred_explore_count, self.episode_number)
 
-        reward_paths = calc_reward.generate_rewards(
-            reward_path=reward_path,
-            eval_path=eval_path,
-            reward_columns=config.settings['p{}_model'.format(self.player_idx)]['reward_columns'][0],
-            falloff=config.settings['p{}_model'.format(self.player_idx)]['reward_falloff'],
-            player_idx=self.player_idx,
-            reaction_delay=self.reaction_delay,
-            atk_preframes=config.settings['p{}_model'.format(self.player_idx)]['atk_preframes'],
-            whiff_reward=config.settings['p{}_model'.format(self.player_idx)]['whiff_reward'],
-            reward_gamma=config.settings['p{}_model'.format(self.player_idx)]['reward_gamma'],
-            frames_per_observation=config.settings['p{}_model'.format(self.player_idx)]['frames_per_observation'],
-            stats_path=stats_path,
-            episode_number=self.episode_number
-        )
-        if config.settings['last_episode_only']:
-            reward_sample = [reward_paths]
-        else:
-            self.reward_paths.append(reward_paths)
-            if len(self.reward_paths) > config.settings['episode_sample_size']:
-                reward_sample = random.sample(self.reward_paths, config.settings['episode_sample_size'])
+        try:
+            reward_paths = calc_reward.generate_rewards(
+                reward_path=reward_path,
+                eval_path=eval_path,
+                reward_columns=config.settings['p{}_model'.format(self.player_idx)]['reward_columns'][0],
+                falloff=config.settings['p{}_model'.format(self.player_idx)]['reward_falloff'],
+                player_idx=self.player_idx,
+                reaction_delay=self.reaction_delay,
+                atk_preframes=config.settings['p{}_model'.format(self.player_idx)]['atk_preframes'],
+                whiff_reward=config.settings['p{}_model'.format(self.player_idx)]['whiff_reward'],
+                reward_gamma=config.settings['p{}_model'.format(self.player_idx)]['reward_gamma'],
+                frames_per_observation=config.settings['p{}_model'.format(self.player_idx)]['frames_per_observation'],
+                stats_path=stats_path,
+                episode_number=self.episode_number
+            )
+            if config.settings['last_episode_only']:
+                reward_sample = [reward_paths]
             else:
-                reward_sample = self.reward_paths
+                self.reward_paths.append(reward_paths)
+                if len(self.reward_paths) > config.settings['episode_sample_size']:
+                    reward_sample = random.sample(self.reward_paths, config.settings['episode_sample_size'])
+                else:
+                    reward_sample = self.reward_paths
 
-        rnn_model_train.train_model(reward_sample, stats_path, self.model, self.target, self.optimizer,
-                                    config.settings['epochs'],
-                                    self.episode_number, self.frames_per_evaluation,
-                                    config.settings['p{}_model'.format(self.player_idx)]['reward_gamma'])
+            rnn_model_train.train_model(reward_sample, stats_path, self.model, self.target, self.optimizer,
+                                        config.settings['epochs'],
+                                        self.episode_number, self.frames_per_evaluation,
+                                        config.settings['p{}_model'.format(self.player_idx)]['reward_gamma'])
+        except calc_reward.ZeroRewardDiff:
+            print("Zero reward in eval={}".format(eval_path))
+            logger.debug("Zero reward in eval={}".format(eval_path))
 
     def run(self):
         try:

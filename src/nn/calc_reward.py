@@ -8,6 +8,10 @@ import itertools
 from torch.utils.tensorboard import SummaryWriter
 
 
+class ZeroRewardDiff(Exception):
+    pass
+
+
 logging.basicConfig(filename='../logs/train.log', level=logging.DEBUG, format='%(asctime)s %(levelname)-8s %(message)s')
 logger = logging.getLogger(__name__)
 
@@ -100,9 +104,14 @@ def generate_diff(eval_state_df: pd.DataFrame, reward_columns: dict) -> pd.DataF
     :param reward_columns:
     :return:
     """
+    total_diff = 0
+
     for c, modifer in reward_columns.items():
         eval_state_df['{}_diff'.format(c)] = eval_state_df[c].diff()
         eval_state_df['{}_diff'.format(c)] = eval_state_df['{}_diff'.format(c)] * modifer
+
+    if total_diff == 0:
+        raise ZeroRewardDiff()
 
     return eval_state_df
 
