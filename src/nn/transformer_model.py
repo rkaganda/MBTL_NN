@@ -22,14 +22,14 @@ class PositionalEncoding(nn.Module):
 
 
 class TransformerModel(nn.Module):
-    def __init__(self, state_size, action_size, nhead, nhid, nlayers, dropout=0.5):
+    def __init__(self, input_size, output_size, attention_heads, hidden_dim,  num_layers, dropout=0.5):
         super(TransformerModel, self).__init__()
         self.model_type = 'Transformer'
         self.src_mask = None
-        self.pos_encoder = PositionalEncoding(state_size + action_size, dropout)
-        encoder_layers = nn.TransformerEncoderLayer(state_size + action_size, nhead, nhid, dropout)
-        self.transformer_encoder = nn.TransformerEncoder(encoder_layers, nlayers)
-        self.decoder = nn.Linear(state_size + action_size, state_size)
+        self.pos_encoder = PositionalEncoding(input_size, dropout)
+        encoder_layers = nn.TransformerEncoderLayer(input_size, attention_heads, hidden_dim, dropout)
+        self.transformer_encoder = nn.TransformerEncoder(encoder_layers, num_layers)
+        self.decoder = nn.Linear(input_size, output_size)
         self.init_weights()
 
     def _generate_square_subsequent_mask(self, sz):
@@ -52,3 +52,15 @@ class TransformerModel(nn.Module):
         output = self.transformer_encoder(src, self.src_mask)
         output = self.decoder(output)
         return output
+
+
+def setup_model(input_size, actions_size, learning_rate, hyperparams):
+    model = TransformerModel(
+        input_size=input_size,
+        output_size=actions_size,
+        **hyperparams
+    )
+
+    optimizer = torch.optim.AdamW(model.parameters(), lr=learning_rate)
+
+    return model, optimizer

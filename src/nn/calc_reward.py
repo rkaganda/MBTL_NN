@@ -109,6 +109,7 @@ def generate_diff(eval_state_df: pd.DataFrame, reward_columns: dict) -> pd.DataF
     for c, modifer in reward_columns.items():
         eval_state_df['{}_diff'.format(c)] = eval_state_df[c].diff()
         eval_state_df['{}_diff'.format(c)] = eval_state_df['{}_diff'.format(c)] * modifer
+        total_diff = total_diff + eval_state_df['{}_diff'.format(c)]
 
     if total_diff == 0:
         raise ZeroRewardDiff()
