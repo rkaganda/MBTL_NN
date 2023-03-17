@@ -42,12 +42,11 @@ class Model(nn.Module):
         return hidden
 
 
-def setup_model(input_size, actions_size, learning_rate):
+def setup_model(input_size, actions_size, learning_rate, hyperparams):
     model = Model(
         input_size=input_size,
         output_size=actions_size,
-        hidden_dim=input_size,
-        num_layers=1
+        **hyperparams
     )
 
     optimizer = torch.optim.AdamW(model.parameters(), lr=learning_rate)

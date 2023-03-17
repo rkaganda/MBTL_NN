@@ -135,23 +135,25 @@ class EvalWorker(mp.Process):
         load existing if exists for run
         :return:
         """
+        torch.manual_seed(0)
+
         self.model, self.optimizer = model.setup_model(
             actions_size=self.input_index_max + 1,
             input_size=self.model_input_size,
-            learning_rate=self.learning_rate
+            learning_rate=self.learning_rate,
+            hyperparams=config.settings['p{}_model'.format(self.player_idx)]['hyperparams']
         )
 
         self.target, _ = model.setup_model(
             actions_size=self.input_index_max + 1,
             input_size=self.model_input_size,
-            learning_rate=self.learning_rate
+            learning_rate=self.learning_rate,
+            hyperparams=config.settings['p{}_model'.format(self.player_idx)]['hyperparams']
         )
 
         self.episode_number, self.run_count = eval_util.get_next_episode(player_idx=self.player_idx)
         if not model_util.load_model(self.model, self.optimizer, self.player_idx):
             print("fresh model")
-            torch.manual_seed(0)
-
             model_util.save_model(self.model, self.optimizer, self.player_idx)
 
         self.target.load_state_dict(self.model.state_dict())

@@ -5,6 +5,9 @@ player_count: 2
 p0_model:
   name: "shiki_test_1"
   type: 'rnn'
+  hyperparams:
+    hidden_dim: 1024
+    num_layers: 2
   frames_per_observation: 20
   reaction_delay: 1
   learning_rate: 1e-4
@@ -21,6 +24,9 @@ p0_model:
 p1_model:
   name: "shiki_test_2"
   type: 'rnn'
+  hyperparams:
+    hidden_dim: 1024
+    n_layers: 2
   frames_per_observation: 20
   reaction_delay: 1
   learning_rate: 1e-4
