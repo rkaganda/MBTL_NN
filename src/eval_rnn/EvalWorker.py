@@ -213,13 +213,13 @@ class EvalWorker(mp.Process):
         reward_paths = calc_reward.generate_rewards(
             reward_path=reward_path,
             eval_path=eval_path,
-            reward_columns=config.settings['reward_columns'][0],
-            falloff=config.settings['reward_falloff'],
+            reward_columns=config.settings['p{}_model'.format(self.player_idx)]['reward_columns'][0],
+            falloff=config.settings['p{}_model'.format(self.player_idx)]['reward_falloff'],
             player_idx=self.player_idx,
             reaction_delay=self.reaction_delay,
-            atk_preframes=config.settings['atk_preframes'],
-            whiff_reward=config.settings['whiff_reward'],
-            reward_gamma=config.settings['reward_gamma'],
+            atk_preframes=config.settings['p{}_model'.format(self.player_idx)]['atk_preframes'],
+            whiff_reward=config.settings['p{}_model'.format(self.player_idx)]['whiff_reward'],
+            reward_gamma=config.settings['p{}_model'.format(self.player_idx)]['reward_gamma'],
             frames_per_observation=config.settings['p{}_model'.format(self.player_idx)]['frames_per_observation'],
             stats_path=stats_path,
             episode_number=self.episode_number
@@ -235,7 +235,8 @@ class EvalWorker(mp.Process):
 
         train_rnn_model.train_model(reward_sample, stats_path, self.model, self.target, self.optimizer,
                                     config.settings['epochs'],
-                                    self.episode_number, self.frames_per_evaluation)
+                                    self.episode_number, self.frames_per_evaluation,
+                                    config.settings['p{}_model'.format(self.player_idx)]['reward_gamma'])
 
     def run(self):
         try:
@@ -321,18 +322,18 @@ class EvalWorker(mp.Process):
                             explore = 0
                             if random.random() < eps_threshold:  # explore
                                 explore = 1
-                                if config.settings['input_mask'] is None:  # if no input mask
+                                if config.settings['p{}_model'.format(self.player_idx)]['input_mask'] is None:  # if no input mask
                                     action_index = random.randrange(0, len(detached_out))  # select random action
                                 else:
                                     # select random from mask
-                                    action_index = random.choice(config.settings['input_mask'])
+                                    action_index = random.choice(config.settings['p{}_model'.format(self.player_idx)]['input_mask'])
                             else:  # no explore
-                                if config.settings['input_mask'] is None:  # no mask
+                                if config.settings['p{}_model'.format(self.player_idx)]['input_mask'] is None:  # no mask
                                     action_index = torch.argmax(detached_out).numpy().item()  # max predicted Q
                                 else:
                                     # max predicted Q with mask
                                     action_index = torch.argmax(
-                                        detached_out[config.settings['input_mask']]).numpy().item()
+                                        detached_out[config.settings['p{}_model'.format(self.player_idx)]['input_mask']]).numpy().item()
                             max_q = detached_out[action_index].numpy().item()  # store predicted Q
 
                             if explore_better_action and max_q < self.mean_pred_q:  # explore better action
@@ -342,13 +343,13 @@ class EvalWorker(mp.Process):
                                 if out_clone.min() < 0:  # normalize so that min is 0
                                     out_clone = out_clone - out_clone.min()
 
-                                if config.settings['input_mask'] is None:  # no mask
+                                if config.settings['p{}_model'.format(self.player_idx)]['input_mask'] is None:  # no mask
                                     # select action using predicted Q as probability distribution
                                     action_index = torch.multinomial(out_clone, 1).numpy().item()
                                 else:
                                     # select action using predicted Q as probability distribution from input mask
                                     action_index = torch.multinomial(
-                                        out_clone[config.settings['input_mask']], 1).numpy().item()
+                                        out_clone[config.settings['p{}_model'.format(self.player_idx)]['input_mask']], 1).numpy().item()
 
                             self.mean_pred_q = self.mean_pred_q + max_q
                             self.mean_pred_q = self.mean_pred_q / 2
