@@ -21,6 +21,7 @@ import mbtl_input
 import melty_state
 from nn.rnn_eval_worker import EvalWorker
 import nn.rnn_model
+import nn.model_util
 
 state_format = dict()
 state_format['directions'] = config.settings['directions']
@@ -147,7 +148,7 @@ def capture_rounds(round_num: int):
         input_indices[p] = Value('i', neutral_action_index)  # current player action/input
         player_facing_flag[p] = Value('i', facing_flag)  # current player action/input
 
-        model_config = nn.rnn_model.load_model_config(p)
+        model_config = nn.model_util.load_model_config(p)
 
         if model_config['type'] == 'rnn':
             model_worker = nn.rnn_eval_worker.EvalWorker

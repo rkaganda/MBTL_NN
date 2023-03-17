@@ -3,9 +3,9 @@ import traceback
 import math
 import random
 import copy
+import numpy as np
 
 import multiprocessing as mp
-import numpy as np
 
 import torch
 # import torch.multiprocessing as mp
@@ -13,6 +13,7 @@ from torch.utils.tensorboard import SummaryWriter
 
 import melty_state
 import nn.rnn_model as model
+import nn.model_util as model_util
 import nn.eval_util as eval_util
 import config
 from nn import calc_reward
@@ -98,7 +99,8 @@ class EvalWorker(mp.Process):
 
         # normalize game state
         minmax = self.state_format['minmax']
-        game_state, player_facing_flag = melty_state.encode_relative_states(copy.deepcopy(state['game']), self.player_idx)
+        game_state, player_facing_flag = melty_state.encode_relative_states(
+            copy.deepcopy(state['game']), self.player_idx)
         norm_state['game'] = list()
         for p_idx in [0, 1]:  # for each player state
             for attrib in self.state_format['values']:  # for each attribute
@@ -114,7 +116,8 @@ class EvalWorker(mp.Process):
             categorical_states = []
             for category in self.state_format['categories']:
                 category_list = [0] * len(self.state_format['categorical'][category])
-                category_list[self.state_format['categorical'][category][str(game_state[p_idx][category])]] = 1  # encode
+                category_list[
+                    self.state_format['categorical'][category][str(game_state[p_idx][category])]] = 1  # encode
                 categorical_states = categorical_states + category_list
             # append categorical
             norm_state['game'] = norm_state['game'] + categorical_states
@@ -145,11 +148,11 @@ class EvalWorker(mp.Process):
         )
 
         self.episode_number, self.run_count = eval_util.get_next_episode(player_idx=self.player_idx)
-        if not model.load_model(self.model, self.optimizer, self.player_idx):
+        if not model_util.load_model(self.model, self.optimizer, self.player_idx):
             print("fresh model")
             torch.manual_seed(0)
 
-            model.save_model(self.model, self.optimizer, self.player_idx)
+            model_util.save_model(self.model, self.optimizer, self.player_idx)
 
         self.target.load_state_dict(self.model.state_dict())
         self.model = self.model.to(device)
@@ -161,16 +164,13 @@ class EvalWorker(mp.Process):
         self.target.eval()
 
         # warm up model
-        stress_data = []
-        for n in range(0, self.frames_per_evaluation+1):
-            stress_data.append([[random.random() for n in range(0, self.model_input_size)]])
-
-        in_tensor = torch.Tensor([stress_data]).to(device)
+        warm_up_data = np.random.rand(1, self.frames_per_evaluation, self.model_input_size)
+        in_tensor = torch.Tensor(warm_up_data).to(device)
 
         # input data into model
         with torch.no_grad():
             for i in range(0, in_tensor.size()[0]):
-                out_tensor, hidden_state = self.model(in_tensor[i])
+                _, _ = self.model(in_tensor[i])
 
     def round_cleanup(self, normalized_states, model_output):
         """
@@ -194,7 +194,7 @@ class EvalWorker(mp.Process):
 
         if config.settings['save_model'] and (self.run_count % config.settings['count_save']) == 0:
             self.reward_train()
-            model.save_model(self.model, self.optimizer, self.player_idx)
+            model_util.save_model(self.model, self.optimizer, self.player_idx)
             self.episode_number += 1
 
     def reward_train(self):
@@ -204,7 +204,7 @@ class EvalWorker(mp.Process):
         eval_path = "{}/eval/{}/evals/{}/{}".format(config.settings['data_path'], config.settings['run_name'],
                                                     self.player_idx, self.episode_number)
         stats_path = "{}/runs/{}_{}".format(config.settings['data_path'], config.settings['run_name'],
-                                         self.player_idx)
+                                            self.player_idx)
 
         writer = SummaryWriter(stats_path)
         writer.add_scalar("{}/{}".format("explore", "mean_pred_q"), self.mean_pred_q, self.episode_number)
@@ -258,7 +258,6 @@ class EvalWorker(mp.Process):
             no_explore_count = 0
             explore_better_action = config.settings['probability_action']
             self.mean_pred_q = 0
-            last_mean_pred_q = self.mean_pred_q
             self.mean_pred_explore_count = 0
 
             # TODO ACTION SCRIPT
@@ -322,18 +321,21 @@ class EvalWorker(mp.Process):
                             explore = 0
                             if random.random() < eps_threshold:  # explore
                                 explore = 1
-                                if config.settings['p{}_model'.format(self.player_idx)]['input_mask'] is None:  # if no input mask
+                                # if no input mask
+                                if config.settings['p{}_model'.format(self.player_idx)]['input_mask'] is None:
                                     action_index = random.randrange(0, len(detached_out))  # select random action
                                 else:
                                     # select random from mask
-                                    action_index = random.choice(config.settings['p{}_model'.format(self.player_idx)]['input_mask'])
+                                    action_index = random.choice(
+                                        config.settings['p{}_model'.format(self.player_idx)]['input_mask'])
                             else:  # no explore
-                                if config.settings['p{}_model'.format(self.player_idx)]['input_mask'] is None:  # no mask
+                                # no mask
+                                if config.settings['p{}_model'.format(self.player_idx)]['input_mask'] is None:
                                     action_index = torch.argmax(detached_out).numpy().item()  # max predicted Q
                                 else:
                                     # max predicted Q with mask
-                                    action_index = torch.argmax(
-                                        detached_out[config.settings['p{}_model'.format(self.player_idx)]['input_mask']]).numpy().item()
+                                    action_index = torch.argmax(detached_out[config.settings[
+                                        'p{}_model'.format(self.player_idx)]['input_mask']]).numpy().item()
                             max_q = detached_out[action_index].numpy().item()  # store predicted Q
 
                             if explore_better_action and max_q < self.mean_pred_q:  # explore better action
@@ -343,13 +345,15 @@ class EvalWorker(mp.Process):
                                 if out_clone.min() < 0:  # normalize so that min is 0
                                     out_clone = out_clone - out_clone.min()
 
-                                if config.settings['p{}_model'.format(self.player_idx)]['input_mask'] is None:  # no mask
+                                # no mask
+                                if config.settings['p{}_model'.format(self.player_idx)]['input_mask'] is None:
                                     # select action using predicted Q as probability distribution
                                     action_index = torch.multinomial(out_clone, 1).numpy().item()
                                 else:
                                     # select action using predicted Q as probability distribution from input mask
                                     action_index = torch.multinomial(
-                                        out_clone[config.settings['p{}_model'.format(self.player_idx)]['input_mask']], 1).numpy().item()
+                                        out_clone[config.settings['p{}_model'.format(self.player_idx)]['input_mask']],
+                                        1).numpy().item()
 
                             self.mean_pred_q = self.mean_pred_q + max_q
                             self.mean_pred_q = self.mean_pred_q / 2
@@ -423,7 +427,6 @@ class EvalWorker(mp.Process):
                     model_output.clear()  # clear
                     last_normalized_index = 0
                     last_evaluated_index = 0
-                    last_mean_pred_q = self.mean_pred_q
                     self.mean_pred_q = 0
                     self.mean_pred_explore_count = 0
                     self.run_count = self.run_count + 1
