@@ -164,13 +164,11 @@ class EvalWorker(mp.Process):
         self.target.eval()
 
         # warm up model
-        warm_up_data = np.random.rand(1, self.frames_per_evaluation, self.model_input_size)
-        in_tensor = torch.Tensor(warm_up_data).to(device)
+        in_tensor = torch.rand(1, self.frames_per_evaluation, self.model_input_size).to(device)
 
         # input data into model
         with torch.no_grad():
-            for i in range(0, in_tensor.size()[0]):
-                _, _ = self.model(in_tensor[i])
+            _, _ = self.model(in_tensor)
 
     def round_cleanup(self, normalized_states, model_output):
         """
