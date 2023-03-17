@@ -64,38 +64,12 @@ def calculate_actual_state_df(file_dict: dict) -> pd.DataFrame:
             for attrib, value in player_states.items():
                 row["p_{}_{}".format(player_id, attrib)] = value
 
-        row["input"] = item['input']
+        row["p_input"] = item['input']
         actual_state_dict[index] = row
 
     actual_state_df = pd.DataFrame.from_dict(actual_state_dict, orient='index')
 
     return actual_state_df
-
-
-def calculate_reformed_input_df(eval_df: pd.DataFrame, norm_state_df: pd.DataFrame) -> pd.DataFrame:
-    """
-    merge the eval and normalized state dataframes such that each row represent an evaluation frame
-
-    :param eval_df:
-    :param norm_state_df:
-    :return:
-    """
-    input_windows = list()
-    for idx, row in eval_df.iterrows():
-        input_window = list()
-        # the model evaluates multiple frames of data each frame
-        # window_0 and window_1 are index of the start and end frames of data for that evaluation frame
-        for idx in range(int(row['window_0']), int(row['window_1']) + 1):
-            input_window = input_window + norm_state_df.iloc[idx].to_list()
-        input_windows.append(input_window)
-
-    reformed_input_df = pd.DataFrame(input_windows)
-    reformed_input_df.index = list(reformed_input_df.index)
-    reformed_input_df.columns = list(reformed_input_df.columns)
-    reformed_input_df.columns = reformed_input_df.columns.map(str)
-    reformed_input_df = reformed_input_df.add_prefix("state_")
-
-    return reformed_input_df
 
 
 def create_eval_state_df(eval_df: pd.DataFrame, actual_state_df: pd.DataFrame) -> pd.DataFrame:
@@ -133,7 +107,7 @@ def generate_diff(eval_state_df: pd.DataFrame, reward_columns: dict) -> pd.DataF
     return eval_state_df
 
 
-def trim_reward_df(df: pd.DataFrame, reward_column: str, reaction_delay: int) -> pd.DataFrame:
+def trim_reward_df(df: pd.DataFrame, reward_column: str) -> pd.DataFrame:
     """
     remove all columns not needed to generate reward file
     :param eval_state_df:
@@ -142,14 +116,10 @@ def trim_reward_df(df: pd.DataFrame, reward_column: str, reaction_delay: int) ->
     :return:
     """
     state_columns = [c for c in df.columns if c.startswith('input_')]
-    df = df[state_columns + [reward_column] + ['action_index']]
+    df = df[state_columns + [reward_column] + ['action_index', 'done', 'pred_q', 'old_idx']]
     df = df.rename(columns={reward_column: "reward"})
 
     df = df[:-1]
-
-    # df['reward'] = (df['reward'] - 242.558952) / 758.366903
-    df['reward'] = df['reward'] / 4000
-    df['reward'] = df['reward'].shift(-(reaction_delay+1))
 
     df = df.dropna()
 
@@ -203,28 +173,43 @@ def calculate_reward_from_eval(
     eval_state_df = apply_negative_motion_type_reward(eval_state_df, atk_preframes, whiff_reward)
 
     # apply reward discounts
-    eval_state_df = apply_reward_discount(eval_state_df, reward_gamma)
+    eval_state_df = apply_reward_discount(eval_state_df, frames_per_observation)
 
     calculate_pred_q_error(eval_state_df, stats_path, episode_number)
 
     # trim full df down to just state, action, reward
-    output_with_input_and_reward = trim_reward_df(eval_state_df, 'actual_reward', reaction_delay)
+    output_with_input_and_reward = trim_reward_df(eval_state_df, 'actual_reward')
 
     return output_with_input_and_reward
 
 
-def apply_reward_discount(df, discount_factor):
-    discounted_rewards = []
-    cumulative_reward = 0
-    rewards = df['reward'].to_list()
-    for reward in rewards[::-1]:
-        cumulative_reward = reward + cumulative_reward * discount_factor
-        discounted_rewards.append(cumulative_reward)
-    discounted_rewards = discounted_rewards[::-1]
-    df['discounted_reward'] = discounted_rewards
-    df['actual_reward'] = df['discounted_reward']
+def apply_reward_discount(df: pd.DataFrame, frames_per_observation: int):
+    df['actual_reward'] = df['reward']
 
-    return df
+    df['actual_reward'] = df.apply(lambda x: 0 if abs(x['actual_reward']) < .01 else x['actual_reward'], axis=1)
+
+    new_df = []
+    last_value = 0
+    sequence_count = []
+
+    index_set = set()
+
+    for idx, row in df.iterrows():
+        if row['actual_reward'] != 0 or last_value != 0:
+            for i in range(idx - frames_per_observation, idx + 1):
+                index_set.add(i)
+        last_value = row['actual_reward']
+
+    new_df = df[df.index.isin(list(index_set))].copy()
+    new_df.sort_index(inplace=True)
+    new_df['index_diff'] = new_df.index.to_series().diff()
+    new_df['done'] = new_df.apply(lambda x: 0 if x['index_diff'] == 1 else 1, axis=1)
+    new_df.reset_index(inplace=True)
+    new_df.rename(columns={'index': 'old_idx'}, inplace=True)
+    new_df.loc[0, 'done'] = 0
+    new_df.loc[new_df.index[-2], 'done'] = 1
+
+    return new_df
 
 
 def apply_motion_type_reward(df: pd.DataFrame, atk_preframes: int, whiff_reward: float):
@@ -256,7 +241,8 @@ def apply_motion_type_reward(df: pd.DataFrame, atk_preframes: int, whiff_reward:
     u = df.groupby(v)[enemy_hit_col].agg(['all', 'count'])
     m = u['all'] & u['count'].ge(1)
 
-    hit_motion_segments = []
+    hit_motion_segments_value = {}
+
     # create motion_type segments
     hit_change_segments = df.groupby(v).apply(lambda x: (x.index[0], x.index[-1]))[m]
     for hs in hit_change_segments:
@@ -265,18 +251,16 @@ def apply_motion_type_reward(df: pd.DataFrame, atk_preframes: int, whiff_reward:
         hit_motion_start = hs[0]
         while hit_motion_type == df.loc[hit_motion_start - 1, 'p_0_motion_type']:
             hit_motion_start = hit_motion_start - 1
-        hit_motion_segments.append(hit_motion_start)
+        hit_motion_segments_value[hit_motion_start] = df[(df.index >= hs[0]) & (df.index <= hs[1])][
+            'p_1_health_diff'].sum()  # sum all damage for the entire hit segment
 
     # apply reward for each motion seg
     for hs in motion_type_segment:
-        if (df[hs[0]:hs[1]][atk_col].sum() > 1) or (hs[0] in hit_motion_segments):  # if motion has attack in it or hits
-            if df[hs[0]:hs[1]][enemy_hit_col].sum() > 1:  # if motion hits
-                reward_value = df[(df.index >= hs[0]) & (df.index <= hs[1])]['p_1_health_diff'].sum()
-            else:
-                reward_value = whiff_reward
-            df.loc[(df.index >= hs[0] - atk_preframes) & (df.index < hs[0]), 'reward'] = \
-                df.loc[
-                    (df.index >= hs[0] - atk_preframes) & (df.index < hs[0]), 'reward'] + reward_value  # apply reward
+        if hs[1] + 1 in hit_motion_segments_value:  # if motion has attack in it or hits
+            reward_start = hs[0]
+            reward_end = hs[1]
+            reward_value = hit_motion_segments_value[hs[1] + 1]
+            df.loc[(df.index >= reward_start) & (df.index < reward_end), 'reward'] = reward_value / 4000  # apply reward
 
     return df
 
@@ -336,9 +320,10 @@ def apply_negative_motion_type_reward(df: pd.DataFrame, atk_preframes: int, whif
     # apply reward for each motion seg
     for hs in motion_type_segment:
         if hs[0] in hit_motion_segments_value:  # if motion has attack in it or hits
-            df.loc[(df.index >= hs[0] - atk_preframes) & (df.index < hs[0]), 'reward'] = \
-                df.loc[(df.index >= hs[0] - atk_preframes) & (df.index < hs[0]), 'reward'] + hit_motion_segments_value[
-                    hs[0]]  # apply reward
+            reward_start = hs[0] - 2
+            reward_end = hs[1] + 1
+            df.loc[(df.index >= reward_start) & (df.index < reward_end), 'reward'] = hit_motion_segments_value[
+                hs[0]]/4000  # apply reward
 
     return df
 
@@ -347,7 +332,7 @@ def calculate_pred_q_error(_df: pd.DataFrame, stats_path: str, episode_num):
     writer = SummaryWriter(stats_path)
 
     df = _df[['actual_reward','pred_q']].copy()
-    df['actual_reward'] = df['actual_reward'] / 4000
+    df['actual_reward'] = df['actual_reward']
     df['pred_q_error'] = df['actual_reward'] - df['pred_q']
     df[['pred_q']] = df[['pred_q']].fillna(value=0)
 
@@ -356,12 +341,13 @@ def calculate_pred_q_error(_df: pd.DataFrame, stats_path: str, episode_num):
     for label, stat in zip(['over_estimated_pred_q', 'under_estimated_pred_q', 'total_pred_q_error'], [over_estimated_pred_q, under_estimated_pred_q, df['pred_q_error'].describe()]):
         for col in ['mean','count','std']:
             if col in stat.index:
-                writer.add_scalar("{}/{}".format(label,col), stat.loc[col], episode_num)
-    writer.add_scalar("reward/train", abs(_df['p_1_health_diff'].sum()/_df['p_0_health_diff'].sum()), episode_num)
-    writer.flush()
+                pass
+                # writer.add_scalar("{}/{}".format(label,col), stat.loc[col], episode_num)
+    # writer.add_scalar("reward/train", abs((1+_df['p_1_health_diff'].sum())/(1+_df['p_0_health_diff'].sum())), episode_num)
+    # writer.flush()
 
 
-def generate_json_from_in_out_df(output_with_input_and_reward: pd.DataFrame):
+def generate_json_from_in_out_df(output_with_input_and_reward: pd.DataFrame, frames_per_observation: int):
     """
     creates reward json from reward dataframe
     :param output_with_input_and_reward:
@@ -372,9 +358,17 @@ def generate_json_from_in_out_df(output_with_input_and_reward: pd.DataFrame):
     state_columns = [c for c in output_with_input_and_reward.columns if c.startswith('input_')]
     action_columns = [c for c in output_with_input_and_reward.columns if c.startswith('action_index')]
 
-    json_dict['state'] = output_with_input_and_reward[state_columns].values.tolist()
-    json_dict['reward'] = output_with_input_and_reward['reward'].values.tolist()
-    json_dict['action'] = output_with_input_and_reward[action_columns].values.tolist()
+    state_padding = [[0.0] * len(state_columns)] * (frames_per_observation - 1)
+    reward_padding = [0.0] * (frames_per_observation - 1)
+    action_padding = [[0.0] * 1] * (frames_per_observation - 1)
+    done_padding = [0.0] * (frames_per_observation - 1)
+
+    json_dict['state'] = state_padding + output_with_input_and_reward[state_columns].values.tolist()
+    json_dict['reward'] = reward_padding + output_with_input_and_reward['reward'].values.tolist()
+    json_dict['action'] = action_padding + output_with_input_and_reward[action_columns].values.tolist()
+    json_dict['done'] = done_padding + output_with_input_and_reward['done'].values.tolist()
+    json_dict['pred_q'] = done_padding + output_with_input_and_reward['pred_q'].values.tolist()
+    json_dict['frame'] = done_padding + output_with_input_and_reward['old_idx'].values.tolist()
 
     return json_dict
 
@@ -420,7 +414,7 @@ def generate_rewards(eval_path: str, reward_path: str, reward_columns: dict, fal
                     episode_number=episode_number
                 )
                 file_json = generate_json_from_in_out_df(
-                    output_with_input_and_reward=df)
+                    output_with_input_and_reward=df, frames_per_observation=frames_per_observation)
 
                 with open("{}/{}".format(reward_path, reward_file), 'w') as f_writer:
                     f_writer.write(json.dumps(file_json))

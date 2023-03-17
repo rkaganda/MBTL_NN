@@ -27,6 +27,9 @@ state_format['directions'] = config.settings['directions']
 state_format['buttons'] = config.settings['buttons']
 state_format['minmax'] = melty_state.get_minmax()
 state_format['attrib'], attrib_keys = melty_state.get_attributes()
+state_format['action_max'] = {}
+state_format['values'] = melty_state.get_values()
+state_format['categories'], state_format['categorical'] = melty_state.get_categories()
 
 
 logging.basicConfig(filename='../logs/train.log', level=logging.DEBUG, format='%(asctime)s %(levelname)-8s %(message)s')
@@ -140,6 +143,7 @@ def capture_rounds(round_num: int):
         eval_statuses_[p]['eval_ready'] = False  # eval ready generate inputs
 
         action_list, neutral_action_index, facing_flag = mbtl_input.create_action_list(p)  # action => key mapping
+        state_format['action_max'][p] = len(action_list) - 1
         input_indices[p] = Value('i', neutral_action_index)  # current player action/input
         player_facing_flag[p] = Value('i', facing_flag)  # current player action/input
 

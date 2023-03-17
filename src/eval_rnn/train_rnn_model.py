@@ -43,32 +43,38 @@ def load_reward_data(reward_paths):
         with open(file) as f:
             file_dict = json.load(f)
         for k_, i_ in file_dict.items():
-            full_data[k_] = full_data[k_] + i_
+            if k_ in full_data.keys():
+                full_data[k_] = full_data[k_] + i_
         full_data['next_state'] = full_data['state'][1:]
         full_data['next_state'].append([0.0] * len(full_data['next_state'][0]))
-        full_data['done'] = [0] * len(full_data['next_state'])
-        full_data['done'][-1] = 1
+
     return full_data
 
 
 class RollingDataset(torch.utils.data.Dataset):
     def __init__(self, states, actions, rewards, next_states, done, window):
-        self.states = torch.Tensor(states).to(device)
-        self.actions = torch.Tensor(actions).to(device)
-        self.rewards = torch.Tensor(rewards).to(device)
-        self.next_states = torch.Tensor(next_states).to(device)
-        self.done = torch.Tensor(done).to(device)
-        self.window = window
+        self.data = []
+
+        index = window - 1
+        while index < len(done) - window:
+            self.data.append([
+                torch.Tensor(states[index: index + window]),
+                torch.Tensor(actions[index:index + window]),
+                torch.Tensor(rewards[index:index + window]),
+                torch.Tensor(next_states[index: index + window]),
+                torch.Tensor(done[index: index + window]),
+            ])
+
+            if done[index + window - 1] == 0:
+                index = index + 1
+            else:
+                index = index + window
 
     def __getitem__(self, index):
-        return [self.states[index:index+self.window],
-                self.actions[index:index+self.window],
-                self.rewards[index:index+self.window],
-                self.next_states[index:index+self.window],
-                self.done[index:index+self.window]]
+        return self.data[index]
 
     def __len__(self):
-        return len(self.states) - self.window
+        return len(self.data)
 
 
 def create_dataset(data, window_size):
@@ -89,31 +95,39 @@ def create_dataset(data, window_size):
 
 
 def train(model, target, optim, data):
-    state = Variable(data[0])
-    action = Variable(data[1])
-    reward = Variable(data[2])
-    next_state = Variable(data[3])
-    done = Variable(data[4])
+    state = Variable(data[0]).to(device)
+    action = Variable(data[1]).to(device)
+    reward = Variable(data[2]).to(device)
+    next_state = Variable(data[3]).to(device)
+    done = Variable(data[4]).to(device)
 
     model.train()
-    train_loss = 0
+    gamma = .5
 
     with torch.no_grad():
         next_q_values, _ = target(next_state)
         next_q_values = next_q_values.max(dim=1)[0]
-        q_targets = reward + (1 - done) * next_q_values
+
+        reward = torch.flatten(reward)
+
+        done = torch.flatten(done)
+
+        q_targets = reward + (1 - done) * next_q_values * config.settings['reward_gamma']
 
     q_values, _ = model(state)
-    q_values = q_values.gather(1, action[0].to(torch.int64)).squeeze(1)
 
-    loss = F.smooth_l1_loss(q_values, q_targets[0])
+    action = action.flatten().unsqueeze(1)
+
+    q_values = q_values.gather(1, action.to(torch.int64)).squeeze(1)
+    reward_error = (q_values - q_targets).abs().mean()
+
+    loss = F.smooth_l1_loss(q_values, q_targets)
     optim.zero_grad()
     loss.backward()
+    nn.utils.clip_grad_value_(model.parameters(), clip_value=1.0)
     optim.step()
 
-    train_loss += loss.item()
-
-    return train_loss, optim.param_groups[0]['lr']
+    return loss, reward_error, optim.param_groups[0]['lr']
 
 
 def train_model(reward_paths, stats_path, model, target, optim, epochs, episode_num, window_size):
@@ -127,13 +141,19 @@ def train_model(reward_paths, stats_path, model, target, optim, epochs, episode_
     dataset = create_dataset(reward_data, window_size)
     sampler = torch.utils.data.RandomSampler(dataset)
 
-    train_loader = torch.utils.data.DataLoader(dataset, sampler=sampler, batch_size=1)
+    train_loader = torch.utils.data.DataLoader(dataset, sampler=sampler, batch_size=len(dataset))
 
-    eps_loss = 0
-    for step, batch_data in tqdm(enumerate(train_loader), total=len(reward_data)):
-        train_loss, lr = train(model, target, optim, batch_data)
-        eps_loss = eps_loss + train_loss
-    writer.add_scalar("Loss/train", eps_loss/len(reward_data), episode_num)
+    eps_loss = 0.0
+    total_reward_error = 0.0
+    for epoch in tqdm(range(epochs)):
+        for step, batch_data in enumerate(train_loader):
+            train_loss, reward_error, lr = train(model, target, optim, batch_data)
+            eps_loss = eps_loss + train_loss
+            total_reward_error = reward_error + total_reward_error
+            # if step >= config.settings['batch_size']:
+            #     break
+    writer.add_scalar("Reward Error/train", total_reward_error/epochs, episode_num)
+    writer.add_scalar("Loss/train", eps_loss/epochs, episode_num)
     writer.flush()
 
 
