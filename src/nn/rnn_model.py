@@ -80,9 +80,8 @@ def load_model_config(p_idx: int) -> dict:
         print("no p{} model_config.json, using config.yaml".format(p_idx))
         Path(dir_path).mkdir(parents=True, exist_ok=True)
         model_config_yaml = config.settings["p{}_model".format(p_idx)]
-        model_config['frames_per_observation'] = int(model_config_yaml['frames_per_observation'])
-        model_config['reaction_delay'] = int(model_config_yaml['reaction_delay'])
-        model_config['learning_rate'] = float(model_config_yaml['learning_rate'])
+        for k_, v_ in model_config_yaml.items():
+            model_config[k_] = v_
         with open(path, "w") as f_writer:
             f_writer.write(json.dumps(model_config))
 

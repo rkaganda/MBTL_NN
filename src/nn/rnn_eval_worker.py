@@ -12,11 +12,11 @@ import torch
 from torch.utils.tensorboard import SummaryWriter
 
 import melty_state
-import eval_rnn.model as model
-import eval_rnn.eval_util as eval_util
+import nn.rnn_model as model
+import nn.eval_util as eval_util
 import config
-from eval_rnn import calc_reward
-from eval_rnn import train_rnn_model
+from nn import calc_reward
+from nn import rnn_model_train
 from action_scripts import action_script
 
 logging.basicConfig(filename='./logs/train.log', level=logging.DEBUG, format='%(asctime)s %(levelname)-8s %(message)s')
@@ -233,7 +233,7 @@ class EvalWorker(mp.Process):
             else:
                 reward_sample = self.reward_paths
 
-        train_rnn_model.train_model(reward_sample, stats_path, self.model, self.target, self.optimizer,
+        rnn_model_train.train_model(reward_sample, stats_path, self.model, self.target, self.optimizer,
                                     config.settings['epochs'],
                                     self.episode_number, self.frames_per_evaluation,
                                     config.settings['p{}_model'.format(self.player_idx)]['reward_gamma'])

@@ -19,8 +19,8 @@ import logging
 import config
 import mbtl_input
 import melty_state
-from eval_rnn.EvalWorker import EvalWorker
-import eval_rnn.model
+from nn.rnn_eval_worker import EvalWorker
+import nn.rnn_model
 
 state_format = dict()
 state_format['directions'] = config.settings['directions']
@@ -147,19 +147,24 @@ def capture_rounds(round_num: int):
         input_indices[p] = Value('i', neutral_action_index)  # current player action/input
         player_facing_flag[p] = Value('i', facing_flag)  # current player action/input
 
-        model_config = eval_rnn.model.load_model_config(p)
+        model_config = nn.rnn_model.load_model_config(p)
+
+        if model_config['type'] == 'rnn':
+            model_worker = nn.rnn_eval_worker.EvalWorker
+        else:
+            raise Exception("No model type '{}' found for p_{}".format(model_config['type'], p))
 
         # create worker for evaluation/training/reward
-        eval_w = EvalWorker(
+        eval_w = model_worker(
             game_states=game_states_,
             env_status=env_status_,
             eval_status=eval_statuses_[p],
-            frames_per_evaluation=model_config['frames_per_observation'],
-            reaction_delay=model_config['reaction_delay'],
+            frames_per_evaluation=int(model_config['frames_per_observation']),
+            reaction_delay=int(model_config['reaction_delay']),
             input_index=input_indices[p],
             input_index_max=len(action_list[p])-1,
             state_format=state_format,
-            learning_rate=model_config['learning_rate'],
+            learning_rate=float(model_config['learning_rate']),
             player_idx=p,
             frame_list=timer_log_,
             neutral_action_index=neutral_action_index,
