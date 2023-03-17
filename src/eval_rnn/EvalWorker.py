@@ -318,7 +318,9 @@ class EvalWorker(mp.Process):
 
                             detached_out = out_tensor[-1].detach().cpu()
 
+                            explore = 0
                             if random.random() < eps_threshold:  # explore
+                                explore = 1
                                 if config.settings['input_mask'] is None:  # if no input mask
                                     action_index = random.randrange(0, len(detached_out))  # select random action
                                 else:
@@ -334,6 +336,7 @@ class EvalWorker(mp.Process):
                             max_q = detached_out[action_index].numpy().item()  # store predicted Q
 
                             if explore_better_action and max_q < self.mean_pred_q:  # explore better action
+                                explore = 2
                                 self.mean_pred_explore_count = self.mean_pred_explore_count + 1
                                 out_clone = detached_out.clone()  # clone the model predicted Qs
                                 if out_clone.min() < 0:  # normalize so that min is 0
@@ -380,6 +383,7 @@ class EvalWorker(mp.Process):
                                 'last_evaluated_index': last_evaluated_index,
                                 'last_normalized_index': last_normalized_index,
                                 "epsilon": self.epsilon,
+                                "explore": explore
                             }
 
                             # increment evaluated index
