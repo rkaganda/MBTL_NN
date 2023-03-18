@@ -274,22 +274,26 @@ class EvalWorker(mp.Process):
                 while not self.env_status['round_done'] and not self.eval_status['kill_eval']:
                     did_store = False  # didn't store for this round yet
                     if len(self.states) > len(normalized_states):  # if there are frames to normalize
-                        # normalize a frame and append to to normalized states
-                        normalized_state, relative_state, player_facing_flag = \
-                            self.normalize_state(self.states[last_normalized_index])
+                        last_state_index = len(self.states)-1
+                        while last_normalized_index < last_state_index:
+                            # normalize a frame and append to to normalized states
+                            normalized_state, relative_state, player_facing_flag = \
+                                self.normalize_state(self.states[last_normalized_index])
 
-                        if last_normalized_index != len(self.relative_states):
-                            raise IndexError
-                        self.relative_states.append(relative_state)
+                            if last_normalized_index != len(self.relative_states):
+                                raise IndexError
+                            self.relative_states.append(relative_state)
 
-                        normalized_states.append(
-                            normalized_state
-                        )
-                        normalized_inputs.append(normalized_states[-1]['input'])
-                        last_normalized_index = last_normalized_index + 1
+                            normalized_states.append(
+                                normalized_state
+                            )
+                            normalized_inputs.append(normalized_states[-1]['input'])
+                            last_normalized_index = last_normalized_index + 1
 
                         # if reaction time has passed, and we have enough frames to eval
                         if (last_normalized_index - self.reaction_delay) > last_evaluated_index:
+                            frames_skipped = last_normalized_index - (last_evaluated_index + self.reaction_delay)
+                            last_evaluated_index = last_normalized_index - self.reaction_delay
                             # create slice for evaluation
                             normalized_states = normalized_states
 
@@ -392,11 +396,13 @@ class EvalWorker(mp.Process):
                                 'last_evaluated_index': last_evaluated_index,
                                 'last_normalized_index': last_normalized_index,
                                 "epsilon": self.epsilon,
-                                "explore": explore
+                                "explore": explore,
+                                "frames_skipped": frames_skipped
                             }
 
                             # increment evaluated index
-                            last_evaluated_index = last_evaluated_index + 1
+                            # TODO
+                            # last_evaluated_index = last_evaluated_index + 1
                     else:
                         pass  # no states yet
                 if not did_store and len(model_output) > 0:  # if we didn't store yet and there are states to store
