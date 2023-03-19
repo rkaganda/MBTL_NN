@@ -1,13 +1,13 @@
-run_name: "transformer training_test"
+run_name: "transformer_full_eval_reward"
 
 player_count: 1
 
 p0_model:
-  name: "transformer_frames"
+  name: "transformer_full_eval_reward_p0"
   type: 'transformer'
   hyperparams:
     hidden_dim: 512
-    num_layers: 1
+    num_layers: 2
     attention_heads: 4
   frames_per_observation: 20
   reaction_delay: 1
@@ -15,6 +15,7 @@ p0_model:
   reward_gamma: .5
   atk_preframes: 2
   whiff_reward: 0
+  full_reward: True
   reward_columns:
     0:
       "p_0_health": 1

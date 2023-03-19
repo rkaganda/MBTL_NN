@@ -227,7 +227,8 @@ class EvalWorker(mp.Process):
                 reward_gamma=self.model_config['reward_gamma'],
                 frames_per_observation=self.model_config['frames_per_observation'],
                 stats_path=stats_path,
-                episode_number=self.episode_number
+                episode_number=self.episode_number,
+                full_reward=self.model_config['full_reward']
             )
             if config.settings['last_episode_only']:
                 reward_sample = [reward_paths]

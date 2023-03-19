@@ -147,7 +147,8 @@ def calculate_reward_from_eval(
         frames_per_observation: int,
         reward_gamma: float,
         stats_path: str,
-        episode_number: int
+        episode_number: int,
+        full_reward: bool
 ) -> pd.DataFrame:
     """
     Generate a json reward file from an eval json file
@@ -183,7 +184,7 @@ def calculate_reward_from_eval(
     eval_state_df = apply_negative_motion_type_reward(eval_state_df, atk_preframes, whiff_reward)
 
     # apply reward discounts
-    eval_state_df = apply_reward_discount(eval_state_df, frames_per_observation)
+    eval_state_df = apply_reward_discount(eval_state_df, frames_per_observation, full_reward)
 
     calculate_pred_q_error(eval_state_df, stats_path, episode_number)
 
@@ -193,7 +194,7 @@ def calculate_reward_from_eval(
     return output_with_input_and_reward
 
 
-def apply_reward_discount(df: pd.DataFrame, frames_per_observation: int):
+def apply_reward_discount(df: pd.DataFrame, frames_per_observation: int, full_reward: bool):
     df['actual_reward'] = df['reward']
 
     df['actual_reward'] = df.apply(lambda x: 0 if abs(x['actual_reward']) < .01 else x['actual_reward'], axis=1)
@@ -202,22 +203,29 @@ def apply_reward_discount(df: pd.DataFrame, frames_per_observation: int):
     last_value = 0
     sequence_count = []
 
-    index_set = set()
+    if full_reward:
+        new_df = df.copy()
+        new_df.reset_index(inplace=True)
+        new_df.rename(columns={'index': 'old_idx'}, inplace=True)
+        new_df['done'] = 0
+        new_df.loc[new_df.index[-1], 'done'] = 1
+    else:
+        index_set = set()
 
-    for idx, row in df.iterrows():
-        if row['actual_reward'] != 0 or last_value != 0:
-            for i in range(idx - frames_per_observation, idx + 1):
-                index_set.add(i)
-        last_value = row['actual_reward']
+        for idx, row in df.iterrows():
+            if row['actual_reward'] != 0 or last_value != 0:
+                for i in range(idx - frames_per_observation, idx + 1):
+                    index_set.add(i)
+            last_value = row['actual_reward']
 
-    new_df = df[df.index.isin(list(index_set))].copy()
-    new_df.sort_index(inplace=True)
-    new_df['index_diff'] = new_df.index.to_series().diff()
-    new_df['done'] = new_df.apply(lambda x: 0 if x['index_diff'] == 1 else 1, axis=1)
-    new_df.reset_index(inplace=True)
-    new_df.rename(columns={'index': 'old_idx'}, inplace=True)
-    new_df.loc[0, 'done'] = 0
-    new_df.loc[new_df.index[-2], 'done'] = 1
+        new_df = df[df.index.isin(list(index_set))].copy()
+        new_df.sort_index(inplace=True)
+        new_df['index_diff'] = new_df.index.to_series().diff()
+        new_df['done'] = new_df.apply(lambda x: 0 if x['index_diff'] == 1 else 1, axis=1)
+        new_df.reset_index(inplace=True)
+        new_df.rename(columns={'index': 'old_idx'}, inplace=True)
+        new_df.loc[0, 'done'] = 0
+        new_df.loc[new_df.index[-2], 'done'] = 1
 
     return new_df
 
@@ -385,7 +393,7 @@ def generate_json_from_in_out_df(output_with_input_and_reward: pd.DataFrame, fra
 
 def generate_rewards(eval_path: str, reward_path: str, reward_columns: dict, falloff: int, player_idx: int,
                      reaction_delay: int, atk_preframes: int, whiff_reward: float, frames_per_observation: int,
-                     reward_gamma: int, stats_path: str, episode_number: int) -> str:
+                     reward_gamma: int, stats_path: str, episode_number: int, full_reward: bool) -> str:
     """
     loads all the eval files contained in the eval path and generates a reward file for each
     :param episode_number:
@@ -421,7 +429,8 @@ def generate_rewards(eval_path: str, reward_path: str, reward_columns: dict, fal
                     whiff_reward=whiff_reward,
                     reward_gamma=reward_gamma,
                     stats_path=stats_path,
-                    episode_number=episode_number
+                    episode_number=episode_number,
+                    full_reward=full_reward
                 )
                 file_json = generate_json_from_in_out_df(
                     output_with_input_and_reward=df, frames_per_observation=frames_per_observation)
