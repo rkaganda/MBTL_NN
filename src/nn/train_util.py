@@ -101,41 +101,39 @@ def train(model, target, optim, model_type, criterion, data, gamma):
 
     with torch.no_grad():
         if model_type == 'rnn':
-            print(target)
             # rnn returns last out and hidden state
             next_q_values, _ = target(next_state)
-            # TODO fix bug
-            next_q_values = next_q_values.reshape(next_state.size(0), next_state.size(1), next_q_values.size(1))
-            next_q_values = next_q_values[:, -1, :]
-            reward = reward[:, -1]
-            done = done[:, -1]
             next_q_values, _ = next_q_values.max(dim=1)
+            reward = reward.flatten()
+            done = done.flatten()
+            print("next_q_values.size()={}".format(next_q_values.size()))
         elif model_type == 'transformer':
             # transformer returns full sequence
             next_q_values = target(next_state)
             next_q_values, _ = next_q_values.max(dim=2)
             reward = reward.transpose(0, 1)
             done = done.transpose(0, 1)
+
         q_targets = reward + (1 - done) * next_q_values * gamma
-        q_targets = q_targets.transpose(0, 1)  # transpose for loss
+        if model_type == 'transformer':
+            q_targets = q_targets.transpose(0, 1)  # transpose for loss
 
     if model_type == 'rnn':
         # rnn returns last out and hidden state
         q_values, _ = model(state)
-        # TODO fix bug
-        q_values = q_values.reshape(state.size(0), state.size(1), q_values.size(1))
-        q_values = q_values[:, -1, :]
-        action = action[:, -1]
-        q_values = q_values.gather(1, action.to(torch.int64)).squeeze(1)
+        action = action.flatten()
+        q_values = q_values.gather(1, action.to(torch.int64).unsqueeze(1)).squeeze(1)
     elif model_type == 'transformer':
         # transformer returns full sequence
         q_values = model(state)
         action = action.transpose(0, 1).squeeze(1)
         q_values = q_values.gather(2, action.to(torch.int64)).squeeze(2)
         q_values = q_values.transpose(0, 1)  # transpose for loss
+
     reward_error = (q_values - q_targets).abs().mean()
 
     loss = criterion(q_values, q_targets)
+
     optim.zero_grad()
     loss.backward()
     nn.utils.clip_grad_value_(model.parameters(), clip_value=1.0)
