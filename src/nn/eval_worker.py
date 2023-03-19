@@ -335,8 +335,8 @@ class EvalWorker(mp.Process):
                                     out_tensor, _ = self.model(in_tensor.unsqueeze(0))
                                 elif self.model_config['type'] == 'transformer':
                                     # transformer returns full sequence
-                                    out_tensor = self.model(in_tensor.unsqueeze(1))
-                                    print(out_tensor)
+                                    in_tensor = in_tensor.unsqueeze(0).transpose(0, 1)  # reshape to (seq_length, batch_size, features)
+                                    out_tensor = self.model(in_tensor)[-1, :, :]
 
                             detached_out = out_tensor[-1].detach().cpu()
 
