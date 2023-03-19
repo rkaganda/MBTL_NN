@@ -1,9 +1,9 @@
-run_name: "transformer_train_test"
+run_name: "transformer training_test"
 
 player_count: 1
 
 p0_model:
-  name: "transformer_test"
+  name: "transformer_frames"
   type: 'transformer'
   hyperparams:
     hidden_dim: 512
