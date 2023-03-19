@@ -19,7 +19,7 @@ import logging
 import config
 import mbtl_input
 import melty_state
-from nn.rnn_eval_worker import EvalWorker
+from nn.eval_worker import EvalWorker
 import nn.rnn_model
 import nn.model_util
 
@@ -150,13 +150,8 @@ def capture_rounds(round_num: int):
 
         model_config = nn.model_util.load_model_config(p)
 
-        if model_config['type'] == 'rnn':
-            model_worker = nn.rnn_eval_worker.EvalWorker
-        else:
-            raise Exception("No model type '{}' found for p_{}".format(model_config['type'], p))
-
         # create worker for evaluation/training/reward
-        eval_w = model_worker(
+        eval_w = EvalWorker(
             game_states=game_states_,
             env_status=env_status_,
             eval_status=eval_statuses_[p],

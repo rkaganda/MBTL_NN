@@ -1,6 +1,13 @@
+from tqdm import tqdm
+
 import torch
 import torch.nn as nn
-import torch.optim as optim
+from torch.utils.tensorboard import SummaryWriter
+
+import nn.train_util as train_util
+
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+torch.set_default_dtype(torch.float32)
 
 
 class PositionalEncoding(nn.Module):
@@ -55,12 +62,22 @@ class TransformerModel(nn.Module):
 
 
 def setup_model(input_size, actions_size, learning_rate, hyperparams):
+    input_padding = 0
+    input_size_remainder = input_size % hyperparams['attention_heads']
+    if input_size_remainder != 0:
+        new_size = input_size + \
+                   hyperparams['attention_heads'] - input_size_remainder
+        input_padding = new_size - input_size
+        input_size = new_size
+
     model = TransformerModel(
         input_size=input_size,
         output_size=actions_size,
         **hyperparams
     )
-
+    model.input_padding = input_padding
     optimizer = torch.optim.AdamW(model.parameters(), lr=learning_rate)
 
     return model, optimizer
+
+

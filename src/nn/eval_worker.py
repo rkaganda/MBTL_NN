@@ -8,23 +8,23 @@ import numpy as np
 import multiprocessing as mp
 
 import torch
-# import torch.multiprocessing as mp
 from torch.utils.tensorboard import SummaryWriter
 
 import melty_state
-import nn.transformer_model as model
 import nn.model_util as model_util
 import nn.eval_util as eval_util
+import nn.train_util as train_util
+import nn.rnn_model as rnn_model
+import nn.transformer_model as transformer_model
 import config
 from nn import calc_reward
-from nn import transformer_model_train
 from action_scripts import action_script
 
 logging.basicConfig(filename='./logs/train.log', level=logging.DEBUG, format='%(asctime)s %(levelname)-8s %(message)s')
 logger = logging.getLogger(__name__)
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-torch.set_default_dtype(torch.float64)
+torch.set_default_dtype(torch.float32)
 
 
 class EvalWorker(mp.Process):
@@ -74,6 +74,7 @@ class EvalWorker(mp.Process):
         self.model = None
         self.target = None
         self.optimizer = None
+        self.model_config = config.settings['p{}_model'.format(self.player_idx)]
 
         # get total size of categorical features
         one_hot_size = 0
@@ -81,10 +82,7 @@ class EvalWorker(mp.Process):
             one_hot_size = len(c_list)
         # sum features, value features + categorical features + last input
         self.model_input_size = (len(self.state_format['values'])*2) + (one_hot_size*2) + (input_index_max+1)
-        print(self.model_input_size)
-
         self.episode_number = 0
-
         self.run_count = 1
         self.epsilon = 1
         self.reward_paths = []
@@ -136,19 +134,25 @@ class EvalWorker(mp.Process):
         :return:
         """
         torch.manual_seed(0)
+        if self.model_config['type'] == 'rnn':
+            model = rnn_model
+        elif self.model_config['type'] == 'transformer':
+            model = transformer_model
+        else:
+            raise Exception("{} type model invalid".format(self.model_config['type']))
 
         self.model, self.optimizer = model.setup_model(
             actions_size=self.input_index_max + 1,
             input_size=self.model_input_size,
             learning_rate=self.learning_rate,
-            hyperparams=config.settings['p{}_model'.format(self.player_idx)]['hyperparams']
+            hyperparams=self.model_config['hyperparams']
         )
 
         self.target, _ = model.setup_model(
             actions_size=self.input_index_max + 1,
             input_size=self.model_input_size,
             learning_rate=self.learning_rate,
-            hyperparams=config.settings['p{}_model'.format(self.player_idx)]['hyperparams']
+            hyperparams=self.model_config['hyperparams']
         )
 
         self.episode_number, self.run_count = eval_util.get_next_episode(player_idx=self.player_idx)
@@ -166,11 +170,11 @@ class EvalWorker(mp.Process):
         self.target.eval()
 
         # warm up model
-        in_tensor = torch.rand(1, self.frames_per_evaluation, self.model_input_size).to(device)
+        in_tensor = torch.rand(1, self.frames_per_evaluation, self.model_input_size+self.model.input_padding).to(device)
 
         # input data into model
         with torch.no_grad():
-            _, _ = self.model(in_tensor)
+            _ = self.model(in_tensor)
 
     def round_cleanup(self, normalized_states, model_output):
         """
@@ -214,14 +218,14 @@ class EvalWorker(mp.Process):
             reward_paths = calc_reward.generate_rewards(
                 reward_path=reward_path,
                 eval_path=eval_path,
-                reward_columns=config.settings['p{}_model'.format(self.player_idx)]['reward_columns'][0],
-                falloff=config.settings['p{}_model'.format(self.player_idx)]['reward_falloff'],
+                reward_columns=self.model_config['reward_columns'][0],
+                falloff=self.model_config['reward_falloff'],
                 player_idx=self.player_idx,
                 reaction_delay=self.reaction_delay,
-                atk_preframes=config.settings['p{}_model'.format(self.player_idx)]['atk_preframes'],
-                whiff_reward=config.settings['p{}_model'.format(self.player_idx)]['whiff_reward'],
-                reward_gamma=config.settings['p{}_model'.format(self.player_idx)]['reward_gamma'],
-                frames_per_observation=config.settings['p{}_model'.format(self.player_idx)]['frames_per_observation'],
+                atk_preframes=self.model_config['atk_preframes'],
+                whiff_reward=self.model_config['whiff_reward'],
+                reward_gamma=self.model_config['reward_gamma'],
+                frames_per_observation=self.model_config['frames_per_observation'],
                 stats_path=stats_path,
                 episode_number=self.episode_number
             )
@@ -234,10 +238,11 @@ class EvalWorker(mp.Process):
                 else:
                     reward_sample = self.reward_paths
 
-            rnn_model_train.train_model(reward_sample, stats_path, self.model, self.target, self.optimizer,
-                                        config.settings['epochs'],
-                                        self.episode_number, self.frames_per_evaluation,
-                                        config.settings['p{}_model'.format(self.player_idx)]['reward_gamma'])
+            train_util.train_model(reward_sample, stats_path, self.model, self.target, self.optimizer,
+                                                self.model_config['type'],
+                                                config.settings['epochs'],
+                                                self.episode_number, self.frames_per_evaluation,
+                                                self.model_config['reward_gamma'])
         except calc_reward.ZeroRewardDiff:
             print("Zero reward in eval={}".format(eval_path))
             logger.debug("Zero reward in eval={}".format(eval_path))
@@ -300,10 +305,16 @@ class EvalWorker(mp.Process):
                                                last_evaluated_index+1):
                                 if f_idx < 0:
                                     flat_frames.append(
-                                        [0.0]*len(normalized_states[0]['game']) + [0.0]*len(normalized_inputs[0]))
+                                        [0.0]*len(normalized_states[0]['game']) +
+                                        [0.0]*len(normalized_inputs[0]) +
+                                        [0.0]*self.model.input_padding
+                                    )
                                 else:
                                     flat_frames.append(
-                                        normalized_states[f_idx]['game'] + normalized_inputs[f_idx])
+                                        normalized_states[f_idx]['game'] +
+                                        normalized_inputs[f_idx] +
+                                        [0.0]*self.model.input_padding
+                                    )
                             # # TODO ACTION
                             # if self.player_idx in [1]:
                             #     action_index = act_script.get_action(self.states, last_evaluated_index)
@@ -316,9 +327,16 @@ class EvalWorker(mp.Process):
                             in_tensor = torch.Tensor(flat_frames).to(device)
 
                             # input data into model
+
                             self.model.eval()
                             with torch.no_grad():
-                                out_tensor, hidden_state = self.model(in_tensor.unsqueeze(0))
+                                if self.model_config['type'] == 'rnn':
+                                    # rnn returns last out and hidden state
+                                    out_tensor, _ = self.model(in_tensor.unsqueeze(0))
+                                elif self.model_config['type'] == 'transformer':
+                                    # transformer returns full sequence
+                                    out_tensor = self.model(in_tensor.unsqueeze(1))
+                                    print(out_tensor)
 
                             detached_out = out_tensor[-1].detach().cpu()
 
@@ -326,15 +344,15 @@ class EvalWorker(mp.Process):
                             if random.random() < eps_threshold:  # explore
                                 explore = 1
                                 # if no input mask
-                                if config.settings['p{}_model'.format(self.player_idx)]['input_mask'] is None:
+                                if self.model_config['input_mask'] is None:
                                     action_index = random.randrange(0, len(detached_out))  # select random action
                                 else:
                                     # select random from mask
                                     action_index = random.choice(
-                                        config.settings['p{}_model'.format(self.player_idx)]['input_mask'])
+                                        self.model_config['input_mask'])
                             else:  # no explore
                                 # no mask
-                                if config.settings['p{}_model'.format(self.player_idx)]['input_mask'] is None:
+                                if self.model_config['input_mask'] is None:
                                     action_index = torch.argmax(detached_out).numpy().item()  # max predicted Q
                                 else:
                                     # max predicted Q with mask
@@ -350,13 +368,13 @@ class EvalWorker(mp.Process):
                                     out_clone = out_clone - out_clone.min()
 
                                 # no mask
-                                if config.settings['p{}_model'.format(self.player_idx)]['input_mask'] is None:
+                                if self.model_config['input_mask'] is None:
                                     # select action using predicted Q as probability distribution
                                     action_index = torch.multinomial(out_clone, 1).numpy().item()
                                 else:
                                     # select action using predicted Q as probability distribution from input mask
                                     action_index = torch.multinomial(
-                                        out_clone[config.settings['p{}_model'.format(self.player_idx)]['input_mask']],
+                                        out_clone[self.model_config['input_mask']],
                                         1).numpy().item()
 
                             self.mean_pred_q = self.mean_pred_q + max_q

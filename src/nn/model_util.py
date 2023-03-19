@@ -10,7 +10,7 @@ import datetime
 import config
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-torch.set_default_dtype(torch.float64)
+torch.set_default_dtype(torch.float32)
 
 
 def load_model_config(p_idx: int) -> dict:

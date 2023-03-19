@@ -1,21 +1,13 @@
-import copy
 import logging
-
 import torch
 import torch.nn as nn
 import torch.utils.data as td
-from torch.autograd import Variable
-import torch.nn.functional as F
 from torch.utils.tensorboard import SummaryWriter
 
 import json
-
 from os import listdir
 from os.path import isfile, join
-
 from tqdm import tqdm
-
-import config
 
 logging.basicConfig(filename='../../logs/train.log', level=logging.DEBUG,
                     format='%(asctime)s %(levelname)-8s %(message)s')
@@ -94,28 +86,50 @@ def create_dataset(data, window_size):
     return dataset
 
 
-def train(model, target, optim, criterion, data, gamma):
-    state = Variable(data[0]).to(device)
-    action = Variable(data[1]).to(device)
-    reward = Variable(data[2]).to(device)
-    next_state = Variable(data[3]).to(device)
-    done = Variable(data[4]).to(device)
+def train(model, target, optim, model_type, criterion, data, gamma):
+    state = data[0].to(device)
+    action = data[1].to(device)
+    reward = data[2].to(device)
+    next_state = data[3].to(device)
+    done = data[4].to(device)
+
+    if model_type == 'transformer':
+        state = state.transpose(0, 1)  # reshape to (seq_length, batch_size, features)
+        next_state = next_state.transpose(0, 1)  # reshape (seq_length, batch_size, features)
 
     model.train()
 
     with torch.no_grad():
-        next_q_values, _ = target(next_state)
-        next_q_values = next_q_values.max(dim=1)[0]
-
-        reward = torch.flatten(reward)
-
-        done = torch.flatten(done)
+        if model_type == 'rnn':
+            print(target)
+            # rnn returns last out and hidden state
+            next_q_values, _ = target(next_state)
+            # TODO fix bug
+            next_q_values = next_q_values.reshape(next_state.size(0), next_state.size(1), next_q_values.size(1))
+            next_q_values = next_q_values[:, -1, :]
+            reward = reward[:, -1]
+            done = done[:, -1]
+            next_q_values, _ = next_q_values.max(dim=1)
+        elif model_type == 'transformer':
+            # transformer returns full sequence
+            next_q_values = target(next_state)[-1, :, :].squeeze(0)
+            reward = reward[:, -1]
+            done = done[:, -1]
+            next_q_values, _ = next_q_values.max(dim=1)
 
         q_targets = reward + (1 - done) * next_q_values * gamma
 
-    q_values, _ = model(state)
-
-    action = action.flatten().unsqueeze(1)
+    if model_type == 'rnn':
+        # rnn returns last out and hidden state
+        q_values, _ = model(state)
+        # TODO fix bug
+        q_values = q_values.reshape(state.size(0), state.size(1), q_values.size(1))
+        q_values = q_values[:, -1, :]
+        action = action[:, -1]
+    elif model_type == 'transformer':
+        # transformer returns full sequence
+        q_values = model(state)[-1, :, :].squeeze(0)
+        action = action[:, -1, :]
 
     q_values = q_values.gather(1, action.to(torch.int64)).squeeze(1)
     reward_error = (q_values - q_targets).abs().mean()
@@ -129,11 +143,11 @@ def train(model, target, optim, criterion, data, gamma):
     return loss, reward_error, optim.param_groups[0]['lr']
 
 
-def train_model(reward_paths, stats_path, model, target, optim, epochs, episode_num, window_size, gamma):
+def train_model(reward_paths, stats_path, model, target, optim, model_type, epochs, episode_num, window_size, gamma):
     writer = SummaryWriter(stats_path)
     reward_data = load_reward_data(reward_paths)
 
-    criterion = nn.SmoothL1Loss(reduction='none')
+    criterion = nn.SmoothL1Loss()
     criterion.to(device)
     model.to(device)
 
@@ -146,7 +160,7 @@ def train_model(reward_paths, stats_path, model, target, optim, epochs, episode_
     total_reward_error = 0.0
     for epoch in tqdm(range(epochs)):
         for step, batch_data in enumerate(train_loader):
-            train_loss, reward_error, lr = train(model, target, optim, criterion, batch_data, gamma)
+            train_loss, reward_error, lr = train(model, target, optim, model_type, criterion, batch_data, gamma)
             eps_loss = eps_loss + train_loss
             total_reward_error = reward_error + total_reward_error
             # if step >= config.settings['batch_size']:
@@ -154,5 +168,3 @@ def train_model(reward_paths, stats_path, model, target, optim, epochs, episode_
     writer.add_scalar("Reward Error/train", total_reward_error/epochs, episode_num)
     writer.add_scalar("Loss/train", eps_loss/epochs, episode_num)
     writer.flush()
-
-

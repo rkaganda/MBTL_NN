@@ -7,6 +7,8 @@ import os
 from os import listdir
 from os.path import isfile, join
 import sys
+import numpy as np
+from tqdm import tqdm
 
 
 def store_eval_output(normalized_states: list, states: list, model_output: list, state_format: dict, player_idx: int,
@@ -36,8 +38,20 @@ def store_eval_output(normalized_states: list, states: list, model_output: list,
     Path("{}/evals/{}/{}".format(path, player_idx, episode_number)).mkdir(parents=True, exist_ok=True)
     Path("{}/stats/{}".format(path, player_idx)).mkdir(parents=True, exist_ok=True)
 
+    class NpEncoder(json.JSONEncoder):
+        def default(self, obj):
+            if isinstance(obj, np.integer):
+                return int(obj)
+            if isinstance(obj, np.floating):
+                return float(obj)
+            if isinstance(obj, np.float32):
+                return float(obj)
+            if isinstance(obj, np.ndarray):
+                return obj.tolist()
+            return super(NpEncoder, self).default(obj)
+
     with open("{}/evals/{}/{}/eval_{}.json".format(path, player_idx, episode_number, datetime_str), 'a') as f_writer:
-        f_writer.write(json.dumps(all_data))
+        f_writer.write(json.dumps(all_data, cls=NpEncoder))
 
     with open("{}/config.json".format(path), 'w') as f_writer:
         f_writer.write(json.dumps(config.settings))

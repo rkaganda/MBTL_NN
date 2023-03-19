@@ -3,7 +3,7 @@ import torch.nn as nn
 
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-torch.set_default_dtype(torch.float64)
+torch.set_default_dtype(torch.float32)
 
 
 class Model(nn.Module):
@@ -50,6 +50,7 @@ def setup_model(input_size, actions_size, learning_rate, hyperparams):
     )
 
     optimizer = torch.optim.AdamW(model.parameters(), lr=learning_rate)
+    model.input_padding = 0
 
     return model, optimizer
 
