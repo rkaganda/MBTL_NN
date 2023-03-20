@@ -6,6 +6,7 @@ import copy
 import numpy as np
 
 import multiprocessing as mp
+from multiprocessing import Value
 
 import torch
 from torch.utils.tensorboard import SummaryWriter
@@ -30,8 +31,10 @@ torch.set_default_dtype(torch.float32)
 class EvalWorker(mp.Process):
     def __init__(self, game_states: list, frames_per_evaluation: int, reaction_delay: int, env_status: dict,
                  eval_status: dict,
-                 input_index: int, input_index_max: int, state_format: dict, player_facing_flag: int,
-                 learning_rate: float, player_idx: int, frame_list: list, neutral_action_index: int):
+                 input_index_max: int, state_format: dict, player_facing_flags: dict,
+                 learning_rate: float, player_idx: int, frame_list: list, neutral_action_index: int,
+                 action_buffer: dict, current_state_frame: Value
+                 ):
         """
 
         :param game_states: list of game states for the current round index by frame
@@ -55,12 +58,13 @@ class EvalWorker(mp.Process):
         self.reaction_delay = reaction_delay
         self.env_status = env_status
         self.eval_status = eval_status
-        self.input_index = input_index
         self.input_index_max = input_index_max
         self.learning_rate = learning_rate
         self.player_idx = player_idx
         self.frame_list = frame_list
-        self.player_facing_flag = player_facing_flag
+        self.player_facing_flags = player_facing_flags
+        self.action_buffer = action_buffer
+        self.current_state_frame = current_state_frame
 
         # dora please
 
@@ -228,7 +232,7 @@ class EvalWorker(mp.Process):
                 frames_per_observation=self.model_config['frames_per_observation'],
                 stats_path=stats_path,
                 episode_number=self.episode_number,
-                full_reward=self.model_config['full_reward']
+                full_reward=self.model_config['full_reward'],
             )
             if config.settings['last_episode_only']:
                 reward_sample = [reward_paths]
@@ -255,6 +259,7 @@ class EvalWorker(mp.Process):
 
             normalized_states = list()
             normalized_inputs = list()
+            player_facing_flags = list()
             model_output = dict()
             last_normalized_index = 0
             last_evaluated_index = 0
@@ -280,7 +285,7 @@ class EvalWorker(mp.Process):
                 while not self.env_status['round_done'] and not self.eval_status['kill_eval']:
                     did_store = False  # didn't store for this round yet
                     last_state_index = len(self.states) - 1
-                    while last_normalized_index < last_state_index:
+                    if last_normalized_index < last_state_index:
                         # normalize a frame and append to to normalized states
                         normalized_state, relative_state, player_facing_flag = \
                             self.normalize_state(self.states[last_normalized_index])
@@ -292,135 +297,140 @@ class EvalWorker(mp.Process):
                         normalized_states.append(
                             normalized_state
                         )
+                        player_facing_flags.append(
+                            player_facing_flag
+                        )
                         normalized_inputs.append(normalized_states[-1]['input'])
                         last_normalized_index = last_normalized_index + 1
 
-                        # if reaction time has passed, and we have enough frames to eval
-                        if (last_normalized_index - self.reaction_delay) > last_evaluated_index:
-                            frames_skipped = last_normalized_index - (last_evaluated_index + self.reaction_delay)
-                            last_evaluated_index = last_normalized_index - self.reaction_delay
-                            # create slice for evaluation
-                            normalized_states = normalized_states
+                    # if reaction time has passed, and we have enough frames to eval
+                    if last_normalized_index > last_evaluated_index:
+                        # create slice for evaluation
+                        normalized_states = normalized_states
 
-                            # flatten for input into model
-                            flat_frames = []
+                        # flatten for input into model
+                        flat_frames = []
 
-                            for f_idx in range(last_evaluated_index - self.frames_per_evaluation+1,
-                                               last_evaluated_index+1):
-                                if f_idx < 0:
-                                    flat_frames.append(
-                                        [0.0]*len(normalized_states[0]['game']) +
-                                        [0.0]*len(normalized_inputs[0]) +
-                                        [0.0]*self.model.input_padding
-                                    )
-                                else:
-                                    flat_frames.append(
-                                        normalized_states[f_idx]['game'] +
-                                        normalized_inputs[f_idx] +
-                                        [0.0]*self.model.input_padding
-                                    )
-                            # # TODO ACTION
-                            # if self.player_idx in [1]:
-                            #     action_index = act_script.get_action(self.states, last_evaluated_index)
-                            #
-                            # if act_script.get_current_frame() != -1:
-                            #     max_q = 0
-                            #     detached_out = torch.zeros(self.input_index_max + 1)
+                        for f_idx in range(last_evaluated_index - self.frames_per_evaluation+1,
+                                           last_evaluated_index+1):
+                            if f_idx < 0:
+                                flat_frames.append(
+                                    [0.0]*len(normalized_states[0]['game']) +
+                                    [0.0]*len(normalized_inputs[0]) +
+                                    [0.0]*self.model.input_padding
+                                )
+                            else:
+                                flat_frames.append(
+                                    normalized_states[f_idx]['game'] +
+                                    normalized_inputs[f_idx] +
+                                    [0.0]*self.model.input_padding
+                                )
+                        # # TODO ACTION
+                        # if self.player_idx in [1]:
+                        #     action_index = act_script.get_action(self.states, last_evaluated_index)
+                        #
+                        # if act_script.get_current_frame() != -1:
+                        #     max_q = 0
+                        #     detached_out = torch.zeros(self.input_index_max + 1)
 
-                            # create tensor
-                            in_tensor = torch.Tensor(flat_frames).to(device)
+                        # create tensor
+                        in_tensor = torch.Tensor(flat_frames).to(device)
 
-                            # input data into model
+                        # input data into model
 
-                            self.model.eval()
-                            with torch.no_grad():
-                                if self.model_config['type'] == 'rnn':
-                                    # rnn returns last out and hidden state
-                                    out_tensor, _ = self.model(in_tensor.unsqueeze(0))
-                                elif self.model_config['type'] == 'transformer':
-                                    # transformer returns full sequence
-                                    in_tensor = in_tensor.unsqueeze(0).transpose(0, 1)  # reshape to (seq_length, batch_size, features)
-                                    out_tensor = self.model(in_tensor)[-1, :, :]
+                        self.model.eval()
+                        with torch.no_grad():
+                            if self.model_config['type'] == 'rnn':
+                                # rnn returns last out and hidden state
+                                out_tensor, _ = self.model(in_tensor.unsqueeze(0))
+                            elif self.model_config['type'] == 'transformer':
+                                # transformer returns full sequence
+                                in_tensor = in_tensor.unsqueeze(0).transpose(0, 1)  # reshape to (seq_length, batch_size, features)
+                                out_tensor = self.model(in_tensor)[-1, :, :]
 
-                            detached_out = out_tensor[-1].detach().cpu()
+                        detached_out = out_tensor[-1].detach().cpu()
 
-                            explore = 0
-                            if random.random() < eps_threshold:  # explore
-                                explore = 1
-                                # if no input mask
-                                if self.model_config['input_mask'] is None:
-                                    action_index = random.randrange(0, len(detached_out))  # select random action
-                                else:
-                                    # select random from mask
-                                    action_index = random.choice(
-                                        self.model_config['input_mask'])
-                            else:  # no explore
-                                # no mask
-                                if self.model_config['input_mask'] is None:
-                                    action_index = torch.argmax(detached_out).numpy().item()  # max predicted Q
-                                else:
-                                    # max predicted Q with mask
-                                    action_index = torch.argmax(
-                                        detached_out[self.model_config['input_mask']]
-                                    ).numpy().item()
-                            max_q = detached_out[action_index].numpy().item()  # store predicted Q
+                        explore = 0
+                        if random.random() < eps_threshold:  # explore
+                            explore = 1
+                            # if no input mask
+                            if self.model_config['input_mask'] is None:
+                                action_index = random.randrange(0, len(detached_out))  # select random action
+                            else:
+                                # select random from mask
+                                action_index = random.choice(
+                                    self.model_config['input_mask'])
+                        else:  # no explore
+                            # no mask
+                            if self.model_config['input_mask'] is None:
+                                action_index = torch.argmax(detached_out).numpy().item()  # max predicted Q
+                            else:
+                                # max predicted Q with mask
+                                action_index = torch.argmax(
+                                    detached_out[self.model_config['input_mask']]
+                                ).numpy().item()
+                        max_q = detached_out[action_index].numpy().item()  # store predicted Q
 
-                            if explore_better_action and max_q < self.mean_pred_q:  # explore better action
-                                explore = 2
-                                self.mean_pred_explore_count = self.mean_pred_explore_count + 1
-                                out_clone = detached_out.clone()  # clone the model predicted Qs
-                                if out_clone.min() < 0:  # normalize so that min is 0
-                                    out_clone = out_clone - out_clone.min()
+                        if explore_better_action and max_q < self.mean_pred_q:  # explore better action
+                            explore = 2
+                            self.mean_pred_explore_count = self.mean_pred_explore_count + 1
+                            out_clone = detached_out.clone()  # clone the model predicted Qs
+                            if out_clone.min() < 0:  # normalize so that min is 0
+                                out_clone = out_clone - out_clone.min()
 
-                                # no mask
-                                if self.model_config['input_mask'] is None:
-                                    # select action using predicted Q as probability distribution
-                                    action_index = torch.multinomial(out_clone, 1).numpy().item()
-                                else:
-                                    # select action using predicted Q as probability distribution from input mask
-                                    action_index = torch.multinomial(
-                                        out_clone[self.model_config['input_mask']],
-                                        1).numpy().item()
+                            # no mask
+                            if self.model_config['input_mask'] is None:
+                                # select action using predicted Q as probability distribution
+                                action_index = torch.multinomial(out_clone, 1).numpy().item()
+                            else:
+                                # select action using predicted Q as probability distribution from input mask
+                                action_index = torch.multinomial(
+                                    out_clone[self.model_config['input_mask']],
+                                    1).numpy().item()
 
-                            self.mean_pred_q = self.mean_pred_q + max_q
-                            self.mean_pred_q = self.mean_pred_q / 2
-                            try:
-                                pass
-                                # eval_util.print_q(
-                                #     cur_frame=len(self.states)-1,
-                                #     eval_frame=last_normalized_index,
-                                #     action=action_index,
-                                #     q=max_q,
-                                #     mean_q=self.mean_pred_q
-                                # )
+                        self.mean_pred_q = self.mean_pred_q + max_q
+                        self.mean_pred_q = self.mean_pred_q / 2
+                        try:
+                            pass
+                            # eval_util.print_q(
+                            #     cur_frame=len(self.states)-1,
+                            #     eval_frame=last_normalized_index,
+                            #     action=action_index,
+                            #     q=max_q,
+                            #     mean_q=self.mean_pred_q
+                            # )
 
-                            except RuntimeError as e:
-                                logger.debug("in_tensor={}".format(in_tensor))
-                                logger.debug("detached_out={}".format(action_index))
-                                logger.exception(e)
-                                raise e
+                        except RuntimeError as e:
+                            logger.debug("in_tensor={}".format(in_tensor))
+                            logger.debug("detached_out={}".format(action_index))
+                            logger.exception(e)
+                            raise e
 
-                            self.input_index.value = action_index
-                            self.player_facing_flag.value = player_facing_flag
+                        # self.input_index.value = action_index
+                        self.action_buffer[
+                            last_evaluated_index+self.model_config['reaction_delay']+1
+                        ] = action_index
+                        self.player_facing_flags[
+                            last_evaluated_index+self.model_config['reaction_delay']+1
+                        ] = player_facing_flags[last_evaluated_index]
 
-                            # store model output
-                            model_output[last_evaluated_index] = {
-                                'pred_q': max_q,
-                                'action_index': action_index,
-                                'output': list(detached_out.numpy()),
-                                'frame': self.frame_list[-1],
-                                'input': flat_frames[-1],
-                                'states': len(self.states),
-                                'norm_states': len(normalized_states),
-                                'last_evaluated_index': last_evaluated_index,
-                                'last_normalized_index': last_normalized_index,
-                                "epsilon": self.epsilon,
-                                "explore": explore,
-                                "frames_skipped": frames_skipped
-                            }
+                        # store model output
+                        model_output[last_evaluated_index] = {
+                            'pred_q': max_q,
+                            'action_index': action_index,
+                            'output': list(detached_out.numpy()),
+                            'frame': self.frame_list[-1],
+                            'input': flat_frames[-1],
+                            'states': len(self.states),
+                            'norm_states': len(normalized_states),
+                            'last_evaluated_index': last_evaluated_index,
+                            'last_normalized_index': last_normalized_index,
+                            "epsilon": self.epsilon,
+                            "explore": explore
+                        }
 
-                            # increment evaluated index
-                            last_evaluated_index = last_evaluated_index + 1
+                        # increment evaluated index
+                        last_evaluated_index = last_evaluated_index + 1
                     else:
                         pass  # no states yet
                 if not did_store and len(model_output) > 0:  # if we didn't store yet and there are states to store

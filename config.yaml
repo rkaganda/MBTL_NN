@@ -1,4 +1,4 @@
-run_name: "rnn_debug"
+run_name: "model_delay_debug"
 
 player_count: 1
 
@@ -25,13 +25,13 @@ player_count: 1
 
 
 p0_model:
-  name: "rnn_debug"
+  name: "model_delay_debug_p0"
   type: 'rnn'
   hyperparams:
     hidden_dim: 512
     num_layers: 2
   frames_per_observation: 20
-  reaction_delay: 1
+  reaction_delay: 5
   learning_rate: 1e-4
   reward_gamma: .5
   full_reward: False

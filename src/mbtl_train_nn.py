@@ -51,7 +51,16 @@ def get_state_data(cfg: cfg_tl) -> dict:
     return state_data
 
 
-def monitor_state(game_states, input_indices, timer_log, env_status, eval_statuses, timer_max):
+def monitor_state(
+        game_states,
+        timer_log,
+        env_status,
+        eval_statuses,
+        timer_max,
+        action_buffer,
+        current_state_frame,
+        current_action
+):
     cfg = cfg_tl
     sub = sub_tl
 
@@ -103,8 +112,10 @@ def monitor_state(game_states, input_indices, timer_log, env_status, eval_status
                     timer_log.append(timer)
                     game_states.append({
                         'game': get_state_data(cfg),
-                        'input': [v.value for _, v in input_indices.items()]
+                        'input': [v.value for _, v in current_action.items()]
                     })
+                    with current_state_frame.get_lock():
+                        current_state_frame.value = len(game_states)
 
                     timer_old = timer  # store last time data was logged
                     time.sleep(0.004)  # データが安定するまで待機 # Wait for data to stabilize
@@ -128,13 +139,15 @@ def capture_rounds(round_num: int):
 
     # params
     timer_max = config.settings['timer_max']
+    current_state_frame = Value('i', 0)  # current state frame
 
     eval_statuses_ = dict()
     eval_workers = dict()
     kill_inputs_process = Event()
     do_inputs_processes = dict()
-    input_indices = dict()
-    player_facing_flag = dict()
+    player_facing_flags = dict()
+    action_buffer = dict()
+    current_actions = dict()
 
     # for each player
     for p in range(0, config.settings['player_count']):
@@ -143,10 +156,19 @@ def capture_rounds(round_num: int):
         eval_statuses_[p]['storing_eval'] = False  # eval storing data
         eval_statuses_[p]['eval_ready'] = False  # eval ready generate inputs
 
+        action_buffer[p] = manager.dict()
         action_list, neutral_action_index, facing_flag = mbtl_input.create_action_list(p)  # action => key mapping
+
+        # create a list of pre frames
+        pre_frame_keys = list(range(config.settings['p{}_model'.format(p)]['reaction_delay']+1))
+        # assign the first pre frames to neutral
+        for k in pre_frame_keys:
+            action_buffer[p][k] = neutral_action_index
+        player_facing_flags[p] = manager.dict()  # player facing at frame
+        for k in pre_frame_keys:
+            player_facing_flags[p][k] = p
         state_format['action_max'][p] = len(action_list) - 1
-        input_indices[p] = Value('i', neutral_action_index)  # current player action/input
-        player_facing_flag[p] = Value('i', facing_flag)  # current player action/input
+        current_actions[p] = Value('i', neutral_action_index)
 
         model_config = nn.model_util.load_model_config(p)
 
@@ -157,26 +179,42 @@ def capture_rounds(round_num: int):
             eval_status=eval_statuses_[p],
             frames_per_evaluation=int(model_config['frames_per_observation']),
             reaction_delay=int(model_config['reaction_delay']),
-            input_index=input_indices[p],
             input_index_max=len(action_list[p])-1,
             state_format=state_format,
             learning_rate=float(model_config['learning_rate']),
             player_idx=p,
             frame_list=timer_log_,
             neutral_action_index=neutral_action_index,
-            player_facing_flag=player_facing_flag[p]
+            current_state_frame=current_state_frame,
+            player_facing_flags=player_facing_flags[p],
+            action_buffer=action_buffer[p]
         )
         eval_workers[p] = eval_w
 
         # process to update actions=>keys each frame
         do_input_process = Process(
             target=mbtl_input.do_inputs,
-            args=(input_indices[p], action_list, kill_inputs_process, env_status_, player_facing_flag[p]))
+            args=(action_buffer[p],
+                  action_list,
+                  kill_inputs_process,
+                  env_status_,
+                  player_facing_flags[p],
+                  current_state_frame,
+                  current_actions[p]
+                  ))
         do_inputs_processes[p] = do_input_process
 
     # monitor env and update env state every frame
     monitor_mbtl_process = Process(target=monitor_state,
-                                   args=(game_states_, input_indices, timer_log_, env_status_, eval_statuses_, timer_max))
+                                   args=(game_states_,
+                                         timer_log_,
+                                         env_status_,
+                                         eval_statuses_,
+                                         timer_max,
+                                         action_buffer,
+                                         current_state_frame,
+                                         current_actions
+                                         ))
 
     print("starting")
     logger.debug("starting")

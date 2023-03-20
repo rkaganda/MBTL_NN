@@ -106,7 +106,6 @@ def train(model, target, optim, model_type, criterion, data, gamma):
             next_q_values, _ = next_q_values.max(dim=1)
             reward = reward.flatten()
             done = done.flatten()
-            print("next_q_values.size()={}".format(next_q_values.size()))
         elif model_type == 'transformer':
             # transformer returns full sequence
             next_q_values = target(next_state)

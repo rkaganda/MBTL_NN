@@ -228,7 +228,7 @@ def create_action_list(player_index: int) -> Tuple[list, int, int]:
     return all_combinations, neutral_action_index, player_facing_flag
 
 
-def do_inputs(input_index, action_list: list, die, env_status, player_facing_flag):
+def do_inputs(action_buffer, action_list: list, die, env_status, player_facing_flags, current_state_frame, current_action):
     """
     keeps tracks and processes inputs each frame
     :param input_index: the inputs for the current frame
@@ -241,12 +241,30 @@ def do_inputs(input_index, action_list: list, die, env_status, player_facing_fla
     inputs_held = set()  # keys being held
     inputs_hold = set()  # keys to hold
     inputs_cleared = False
+    last_facing = player_facing_flags[0]
+    last_action = action_buffer[0]
 
     while not die.is_set():
         if not env_status['round_done']:  # if round is live
+            if current_state_frame.value in player_facing_flags:
+                player_facing_flag = player_facing_flags[current_state_frame.value]
+                last_facing = player_facing_flag
+            else:
+                player_facing_flag = last_facing
             time.sleep(.013)  # sleep a frame
             inputs_hold.clear()  # clear held inputs buffer
-            for k in action_list[player_facing_flag.value][input_index.value]:  # for each key
+            try:
+                if current_state_frame.value in action_buffer:
+                    action_index = action_buffer[current_state_frame.value]  # the action index for this frame
+                    last_action = action_index
+                else:
+                    action_index = last_action
+            except KeyError:
+                print(len(action_buffer))
+                raise KeyError
+
+            current_action.value = action_index
+            for k in action_list[player_facing_flag][action_index]:  # for each key
                 if k not in inputs_held:  # if key is not already being held
                     PressKey(k)  # press key
                 inputs_hold.add(k)  # add key to hold
