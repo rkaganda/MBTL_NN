@@ -246,10 +246,10 @@ def do_inputs(action_buffer, action_list: list, die, env_status, player_facing_f
 
     while not die.is_set():
         if not env_status['round_done']:  # if round is live
-            if current_state_frame.value in player_facing_flags:
+            try:
                 player_facing_flag = player_facing_flags[current_state_frame.value]
                 last_facing = player_facing_flag
-            else:
+            except KeyError:
                 player_facing_flag = last_facing
             time.sleep(.013)  # sleep a frame
             inputs_hold.clear()  # clear held inputs buffer
@@ -260,8 +260,7 @@ def do_inputs(action_buffer, action_list: list, die, env_status, player_facing_f
                 else:
                     action_index = last_action
             except KeyError:
-                print(len(action_buffer))
-                raise KeyError
+                action_index = last_action
 
             current_action.value = action_index
             for k in action_list[player_facing_flag][action_index]:  # for each key
