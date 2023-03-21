@@ -112,7 +112,8 @@ def generate_diff(eval_state_df: pd.DataFrame, reward_columns: dict) -> pd.DataF
         total_diff = total_diff + eval_state_df['{}_diff'.format(c)].abs().sum()
 
     if total_diff == 0:
-        raise ZeroRewardDiff()
+        pass
+        # raise ZeroRewardDiff()
 
     return eval_state_df
 

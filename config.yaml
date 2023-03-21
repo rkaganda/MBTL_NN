@@ -1,15 +1,15 @@
-run_name: "transformer_delay_test"
+run_name: "shiki_v_shiki_transformer"
 
-player_count: 1
+player_count: 2
 
 p0_model:
-  name: "shiki_transformer_delay_test"
+  name: "shiki_v"
   type: 'transformer'
   hyperparams:
     hidden_dim: 512
     num_layers: 2
     attention_heads: 4
-  frames_per_observation: 20
+  frames_per_observation: 5
   reaction_delay: 1
   learning_rate: 1e-4
   reward_gamma: .5
@@ -45,17 +45,19 @@ p0_model:
 #  input_mask:
 
 p1_model:
-  name: "frame_skip_test_p2"
-  type: 'rnn'
+  name: "shiki_v_p2"
+  type: 'transformer'
   hyperparams:
-    hidden_dim: 1024
+    hidden_dim: 512
     num_layers: 2
-  frames_per_observation: 20
+    attention_heads: 4
+  frames_per_observation: 5
   reaction_delay: 1
   learning_rate: 1e-4
   reward_gamma: .5
   atk_preframes: 2
   whiff_reward: 0
+  full_reward: True
   reward_columns:
     0:
       "p_0_health": 1
@@ -103,7 +105,7 @@ buttons:
   - "d"
 
 
-timer_max: 9999999
+timer_max: 9999
 
 log_level: DEBUG
 
