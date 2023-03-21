@@ -279,6 +279,7 @@ class EvalWorker(mp.Process):
             act_script = action_script.ActionScript()
 
             self.eval_status['eval_ready'] = True  # eval is ready
+            print("eps={} no_explore={}".format(self.epsilon, no_explore_count))
             while not self.eval_status['kill_eval']:
                 self.eval_status['eval_ready'] = True  # still ready
                 # while round is live and no kill event
@@ -452,8 +453,6 @@ class EvalWorker(mp.Process):
                         esp_count = esp_count + 1
 
                     self.epsilon = round(eps_threshold, 2)
-                    print("eps={} no_explore={}".format(self.epsilon, no_explore_count))
-
                     logger.debug("{} eval cleanup".format(self.player_idx))
                     self.eval_status['eval_ready'] = False  # eval is not ready
                     logger.debug("{} stopping eval".format(self.player_idx))
@@ -471,6 +470,7 @@ class EvalWorker(mp.Process):
                     logger.debug("{} finished cleanup".format(self.player_idx))
                     act_script.reset()
                     self.eval_status['storing_eval'] = False  # finished storing eval
+                    print("eps={} no_explore={}".format(self.epsilon, no_explore_count))
         except Exception as identifier:
             logger.error(identifier)
             logger.error(traceback.format_exc())

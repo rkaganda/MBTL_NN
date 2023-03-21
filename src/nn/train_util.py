@@ -140,7 +140,7 @@ def train_model(reward_paths, stats_path, model, target, optim, model_type, epoc
     dataset = FullRollingDataset(get_reward_file_paths(reward_paths), window_size)
     sampler = torch.utils.data.RandomSampler(dataset)
 
-    train_loader = torch.utils.data.DataLoader(dataset, sampler=sampler, batch_size=len(dataset))
+    train_loader = torch.utils.data.DataLoader(dataset, sampler=sampler, batch_size=512)
 
     eps_loss = 0
     total_steps = 0

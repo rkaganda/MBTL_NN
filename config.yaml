@@ -1,9 +1,9 @@
-run_name: "rk_play_run"
+run_name: "transformer_delay_test"
 
 player_count: 1
 
 p0_model:
-  name: "rk_play"
+  name: "shiki_transformer_delay_test"
   type: 'transformer'
   hyperparams:
     hidden_dim: 512
@@ -81,7 +81,7 @@ eps_explore_threshold: 0
 episode_sample_size: 1
 last_episode_only: False
 batch_size: 512
-epochs: 4
+epochs: 1
 tau: 200
 
 # inputs
