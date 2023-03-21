@@ -83,9 +83,14 @@ class EvalWorker(mp.Process):
         # get total size of categorical features
         one_hot_size = 0
         for c, c_list in self.state_format['categorical'].items():
-            one_hot_size = len(c_list)
+            if c in self.model_config['state_features']:
+                one_hot_size = len(c_list) + one_hot_size
         # sum features, value features + categorical features + last input
-        self.model_input_size = (len(self.state_format['values'])*2) + (one_hot_size*2) + (input_index_max+1)
+        value_size = 0
+        for v in self.state_format['values']:
+            if v in self.model_config['state_features']:
+                value_size = value_size + 1
+        self.model_input_size = (value_size*2) + (one_hot_size*2) + (input_index_max+1)
         self.episode_number = 0
         self.run_count = 1
         self.epsilon = 1
@@ -106,21 +111,23 @@ class EvalWorker(mp.Process):
         norm_state['game'] = list()
         for p_idx in [0, 1]:  # for each player state
             for attrib in self.state_format['values']:  # for each attribute
-                if attrib not in game_state[p_idx]:
-                    print("failed attrib={}".format(attrib))
-                    print(game_state[p_idx])
-                min_max_diff = minmax[attrib]['max'] - minmax[attrib]['min']
-                # norm = (value - min) / (max - min) unless max - min = 0
-                norm_state['game'].append((game_state[p_idx][attrib] - minmax[attrib]['min']) / (
-                    min_max_diff) if min_max_diff != 0 else 0)
+                if attrib in self.model_config['state_features']:
+                    if attrib not in game_state[p_idx]:
+                        print("failed attrib={}".format(attrib))
+                        print(game_state[p_idx])
+                    min_max_diff = minmax[attrib]['max'] - minmax[attrib]['min']
+                    # norm = (value - min) / (max - min) unless max - min = 0
+                    norm_state['game'].append((game_state[p_idx][attrib] - minmax[attrib]['min']) / (
+                        min_max_diff) if min_max_diff != 0 else 0)
 
             # encode categorical
             categorical_states = []
             for category in self.state_format['categories']:
-                category_list = [0] * len(self.state_format['categorical'][category])
-                category_list[
-                    self.state_format['categorical'][category][str(game_state[p_idx][category])]] = 1  # encode
-                categorical_states = categorical_states + category_list
+                if category in self.model_config['state_features']:
+                    category_list = [0] * len(self.state_format['categorical'][category])
+                    category_list[
+                        self.state_format['categorical'][category][str(game_state[p_idx][category])]] = 1  # encode
+                    categorical_states = categorical_states + category_list
             # append categorical
             norm_state['game'] = norm_state['game'] + categorical_states
 
@@ -162,10 +169,10 @@ class EvalWorker(mp.Process):
         self.episode_number, self.run_count = eval_util.get_next_episode(player_idx=self.player_idx)
         if not model_util.load_model(self.model, self.optimizer, self.player_idx):
             print("fresh model")
-            model_util.save_model(self.model, self.optimizer, self.player_idx)
 
         self.target.load_state_dict(self.model.state_dict())
         self.model = self.model.to(device)
+        print("p{} model: \n{}".format(self.player_idx, self.model))
         self.target = self.target.to(device)
 
         if not config.settings['last_episode_only']:

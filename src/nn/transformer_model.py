@@ -11,7 +11,7 @@ torch.set_default_dtype(torch.float32)
 
 
 class PositionalEncoding(nn.Module):
-    def __init__(self, d_model, dropout=0.1, max_len=5000):
+    def __init__(self, d_model, max_len=5000, dropout=0.1):
         super(PositionalEncoding, self).__init__()
         self.dropout = nn.Dropout(p=dropout)
 
@@ -29,11 +29,18 @@ class PositionalEncoding(nn.Module):
 
 
 class TransformerModel(nn.Module):
-    def __init__(self, input_size, output_size, attention_heads, hidden_dim,  num_layers, dropout=0.5):
+    def __init__(self,
+                 input_size,
+                 output_size,
+                 attention_heads,
+                 hidden_dim,
+                 num_layers,
+                 max_sequence_length,
+                 dropout=0.5):
         super(TransformerModel, self).__init__()
         self.model_type = 'Transformer'
         self.src_mask = None
-        self.pos_encoder = PositionalEncoding(input_size, dropout)
+        self.pos_encoder = PositionalEncoding(input_size, max_sequence_length, dropout)
         encoder_layers = nn.TransformerEncoderLayer(input_size, attention_heads, hidden_dim, dropout)
         self.transformer_encoder = nn.TransformerEncoder(encoder_layers, num_layers)
         self.decoder = nn.Linear(input_size, output_size)
