@@ -90,7 +90,10 @@ class EvalWorker(mp.Process):
         for v in self.state_format['values']:
             if v in self.model_config['state_features']:
                 value_size = value_size + 1
-        self.model_input_size = (value_size*2) + (one_hot_size*2) + (input_index_max+1)
+        if self.model_config['action_feature'] or self.model_config['action_feature'] is None:
+            self.model_input_size = (value_size*2) + (one_hot_size*2) + (input_index_max+1)
+        else:
+            self.model_input_size = (value_size * 2) + (one_hot_size * 2)
         self.episode_number = 0
         self.run_count = 1
         self.epsilon = 1
@@ -322,17 +325,29 @@ class EvalWorker(mp.Process):
                         for f_idx in range(last_evaluated_index - self.frames_per_evaluation+1,
                                            last_evaluated_index+1):
                             if f_idx < 0:
-                                flat_frames.append(
-                                    [0.0]*len(normalized_states[0]['game']) +
-                                    [0.0]*len(normalized_inputs[0]) +
-                                    [0.0]*self.model.input_padding
-                                )
+                                if self.model_config['action_feature'] or self.model['action_feature'] is None:
+                                    flat_frames.append(
+                                        [0.0]*len(normalized_states[0]['game']) +
+                                        [0.0]*len(normalized_inputs[0]) +
+                                        [0.0]*self.model.input_padding
+                                    )
+                                else:
+                                    flat_frames.append(
+                                        [0.0] * len(normalized_states[0]['game']) +
+                                        [0.0] * self.model.input_padding
+                                    )
                             else:
-                                flat_frames.append(
-                                    normalized_states[f_idx]['game'] +
-                                    normalized_inputs[f_idx] +
-                                    [0.0]*self.model.input_padding
-                                )
+                                if self.model_config['action_feature'] or self.model['action_feature'] is None:
+                                    flat_frames.append(
+                                        normalized_states[f_idx]['game'] +
+                                        normalized_inputs[f_idx] +
+                                        [0.0]*self.model.input_padding
+                                    )
+                                else:
+                                    flat_frames.append(
+                                        [0.0] * len(normalized_states[0]['game']) +
+                                        [0.0] * self.model.input_padding
+                                    )
                         # # TODO ACTION
                         # if self.player_idx in [1]:
                         #     action_index = act_script.get_action(self.states, last_evaluated_index)
